@@ -169,6 +169,7 @@
     <button class="tab" data-tab="dash">📊 市场监控</button>
     <button class="tab" data-tab="stock">🔎 个股分析</button>
     <button class="tab" data-tab="chain">🔗 产业链</button>
+    <button class="tab" data-tab="gurus">🧑‍💼 名人持仓</button>
     <button class="tab active" data-tab="market">🌐 市场动向</button>
     <button class="tab" data-tab="news">📰 全球新闻</button>
     <button class="tab" data-tab="bloggers">📡 博主追踪</button>
@@ -321,6 +322,16 @@
       <div class="panel scrolly"><h3 id="chainCoTitle">选择上方环节 →</h3><div id="chainCompanies"><div class="muted small">点上方任一环节，查看该环节公司与实时评分排名。</div></div></div>
       <div class="panel scrolly" id="chainRel"><div class="muted small">关系 / 瓶颈 / 催化剂 / 跨环节命门 将在此显示。</div></div>
     </div>
+  </section>
+
+  <!-- ===================== 名人持仓 ===================== -->
+  <section id="gurus">
+    <div class="panel" style="flex:0 0 auto">
+      <h3 style="margin-bottom:6px">🧑‍💼 名人 / 机构持仓 <span class="tag">点人物看其持仓——每只带本台实时评分/涨幅/买点</span></h3>
+      <div id="guruNav" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+      <div class="small muted" style="margin-top:6px">⚠️ <b>都是延迟披露</b>：13F 季度+最多45天滞后、国会交易延迟30-45天、ARK 每日。看的是"大资金大方向押在哪"，<b>非实时买卖信号</b>；权重/交易为披露快照(注明季度+来源)，价格/评分实时。非投资建议。</div>
+    </div>
+    <div id="guruBody" class="panel scrolly" style="flex:1 1 auto;min-height:0"><div class="muted small" style="padding:8px">点上方任一人物。</div></div>
   </section>
 
   <!-- ===================== NEWS ===================== -->
@@ -2988,6 +2999,93 @@ const _brl=$('#blogReload'); if(_brl)_brl.onclick=()=>{ lastLoad.bloggers=0; loa
 /* 每个标签页都按当前实时刷新：打开即刷新(20秒内不重复)，激活标签每隔 refreshSec 自动刷新 */
 const lastLoad={};
 function activeTab(){ return document.querySelector('section.active')?.id; }
+/* =================================================================
+   🧑‍💼 名人/机构持仓：13F(季度·滞后)+ 国会交易(延迟披露)+ ARK(每日)。
+   持仓权重为披露快照(注明季度+来源)，价格/评分实时(computeStock)。数据经联网核实，非编造。
+   ================================================================= */
+// h=[ticker, 权重%, 名称, 非美股/未上市?]
+const GURUS=[
+ {id:'duan',name:'段永平',fund:'H&H International',asof:'2026 Q1',src:'holdingschannel.com',note:'极度集中的价值投资 · 长期持有看得懂的优质企业 · 能力圈内重仓不动。实时观点见雪球「大道无形我有型」。',h:[['AAPL',36.7,'苹果'],['BRK-B',21.9,'伯克希尔B'],['NVDA',12.1,'英伟达'],['PDD',10.1,'拼多多'],['TSLA',6.3,'特斯拉'],['GOOG',5.3,'谷歌C'],['OXY',3.3,'西方石油'],['MSFT',1.9,'微软'],['UNH',0.8,'联合健康'],['DIS',0.7,'迪士尼'],['CRDO',0.4,'Credo'],['TSM',0.3,'台积电']]},
+ {id:'buffett',name:'巴菲特',fund:'伯克希尔·哈撒韦',asof:'2026 Q1',src:'dataroma.com',note:'价值投资 · 护城河 + 低估 + 集中持有 · 超长期。',h:[['AAPL',22,'苹果'],['AXP',17.4,'美国运通'],['KO',11.6,'可口可乐'],['BAC',9.5,'美国银行'],['CVX',6.6,'雪佛龙'],['OXY',6.6,'西方石油'],['GOOGL',5.9,'谷歌A'],['CB',4.2,'Chubb'],['MCO',4.1,'穆迪'],['KHC',2.8,'卡夫亨氏'],['DVA',1.8,'DaVita'],['KR',1.4,'Kroger']]},
+ {id:'lilu',name:'李录',fund:'Himalaya Capital',asof:'2026 Q1',src:'dataroma.com',note:'价值投资 · 中美兼顾 · 集中长期(芒格信任并托付资金的基金经理)。',h:[['GOOGL',22.9,'谷歌A'],['GOOG',22,'谷歌C'],['PDD',14.7,'拼多多'],['BRK-B',13.4,'伯克希尔B'],['EWBC',9.3,'华美银行'],['BAC',4.6,'美国银行'],['OXY',3,'西方石油'],['CROX',2.3,'Crocs'],['TME',1.9,'腾讯音乐'],['HRB',1.6,'H&R Block'],['MCO',1.6,'穆迪'],['SPGI',1.6,'标普全球']]},
+ {id:'munger',name:'芒格',fund:'Daily Journal 证券组合',asof:'2026 Q1',src:'holdingschannel.com',note:'极度集中 · 长期不动 · 几乎零换手(芒格生前掌舵的日报公司组合)。',h:[['WFC',46.7,'富国银行'],['BAC',40.5,'美国银行'],['BABA',10.2,'阿里巴巴'],['USB',2.6,'美国合众银行']]},
+ {id:'ackman',name:'阿克曼',fund:'Pershing Square',asof:'2026 Q1',src:'dataroma.com',note:'积极投资 · 高度集中 · 少数几个大仓位 + 主动介入。',h:[['BN',17.6,'Brookfield'],['AMZN',17.4,'亚马逊'],['UBER',15.7,'Uber'],['MSFT',15.3,'微软'],['QSR',12.2,'餐饮品牌国际'],['META',11.1,'Meta'],['HHH',8.7,'Howard Hughes'],['GOOG',0.7,'谷歌C'],['HTZ',0.5,'赫兹']]},
+ {id:'klarman',name:'卡拉曼',fund:'Baupost Group',asof:'2026 Q1',src:'13f.info',note:'安全边际优先 · 深度价值 · 特殊情境与被低估蓝筹。',h:[['AMZN',12.7,'亚马逊'],['QSR',11.7,'餐饮品牌国际'],['WCC',7.7,'WESCO'],['UNP',7.3,'联合太平洋'],['ELV',7.3,'Elevance'],['GOOG',6.6,'谷歌C'],['FERG',6.6,'Ferguson'],['WTW',5.1,'WTW'],['AON',4.9,'怡安'],['V',4.1,'Visa'],['TFX',3.7,'Teleflex'],['EXP',3.3,'Eagle Materials']]},
+ {id:'tepper',name:'泰珀',fund:'Appaloosa',asof:'2026 Q1',src:'13f.info',note:'灵活机会主义 · 敢重仓科技/中概/AI/能源。',h:[['AMZN',15.2,'亚马逊'],['MU',9.5,'美光'],['GOOG',8.4,'谷歌C'],['UBER',7.7,'Uber'],['TSM',7.6,'台积电'],['BABA',7.3,'阿里巴巴'],['VST',5.1,'Vistra'],['EWY',5,'韩国ETF'],['NVDA',4.3,'英伟达'],['NRG',4.3,'NRG能源'],['META',4.2,'Meta'],['SNDK',3,'SanDisk']]},
+ {id:'druck',name:'德鲁肯米勒',fund:'Duquesne',asof:'2026 Q1',src:'13f.info',note:'宏观对冲 · 高换手 · 集中下注成长股(含指数/个股看涨期权)。',h:[['NTRA',18.1,'Natera'],['EWZ',8.7,'巴西ETF'],['INSM',5.6,'Insmed'],['TSM',5,'台积电'],['RSP',4.7,'标普等权ETF'],['YPF',4.4,'YPF'],['TBBB',3.3,'BBB Foods'],['AA',2.9,'美铝'],['NAMS',2.9,'NewAmsterdam'],['SE',2.7,'Sea'],['STM',2.7,'意法半导体'],['WWD',2.2,'Woodward']]},
+ {id:'burry',name:'伯里',fund:'Scion (已清盘)',asof:'2025 Q3',src:'13f.info',note:'逆向/深度价值 + 宏观做空。该季13F主要是 PLTR/NVDA 看跌期权(看空科技)，仅少量做多股；Scion 已于 2025-11 关闭，这是最后一份。',h:[['MOH',1.7,'Molina'],['LULU',1.3,'Lululemon'],['SLM',1,'Sallie Mae'],['BRKR',1,'Bruker']]},
+ {id:'ark',name:'木头姐 ARK',fund:'ARK Innovation (ARKK)',asof:'每日',src:'stockanalysis.com',note:'高换手 · 颠覆性创新主题 · 重仓特斯拉/基因编辑/加密/AI软件(波动极大、回撤深)。',h:[['TSLA',9.6,'特斯拉'],['TEM',5,'Tempus AI'],['SPCX',4.9,'SpaceX',1],['HOOD',4.9,'Robinhood'],['CRSP',4.7,'CRISPR'],['AMD',4.4,'AMD'],['SHOP',4.2,'Shopify'],['COIN',3.7,'Coinbase'],['CRCL',3.4,'Circle'],['TWST',3.4,'Twist Bio'],['BEAM',3,'Beam'],['ROKU',3,'Roku']]},
+ {id:'tiger',name:'Tiger Global',fund:'Tiger Global (Coleman)',asof:'2026 Q1',src:'stockzoa.com',note:'成长股猎手 · 重仓大型科技与AI半导体 · 全球互联网龙头。',h:[['GOOGL',13.4,'谷歌A'],['NVDA',9.2,'英伟达'],['AMZN',9.1,'亚马逊'],['TSM',8.2,'台积电'],['META',7.7,'Meta'],['SE',5.6,'Sea'],['AVGO',4.9,'博通'],['MSFT',4.1,'微软'],['GEV',3.7,'GE Vernova'],['LRCX',3.6,'泛林'],['SPOT',3.4,'Spotify'],['CPNG',2.9,'Coupang']]},
+ {id:'coatue',name:'Coatue',fund:'Coatue (Laffont)',asof:'2026 Q1',src:'13f.info',note:'科技成长对冲 · AI算力/半导体设备/电力基建全栈布局。',h:[['TSM',10.8,'台积电'],['GEV',7.7,'GE Vernova'],['LRCX',7.4,'泛林'],['AMAT',6.2,'应用材料'],['AVGO',5.9,'博通'],['ETN',5.8,'伊顿'],['AMZN',5.7,'亚马逊'],['META',5.5,'Meta'],['CEG',4.5,'Constellation'],['GOOGL',4.3,'谷歌A'],['NVDA',3.8,'英伟达'],['EQIX',3.7,'Equinix']]},
+];
+// t=[日期, ticker, 买/卖, 类型, 金额区间]
+const CONGRESS=[
+ {id:'pelosi',name:'Nancy Pelosi',role:'众议院 · 前议长',src:'https://www.capitoltrades.com/politicians/P000197',note:'近期偏好大科技/AI与电力股，常用长期看涨期权(LEAPS)加杠杆，由配偶 Paul Pelosi 操作。',t:[['2026-01-16','AB','买入','普通股','$1M–5M'],['2026-01-16','NVDA','买入','看涨期权(行权)','$250K–500K'],['2026-01-16','GOOGL','买入','看涨期权(行权)','$500K–1M'],['2026-01-16','AMZN','买入','看涨期权(行权)','$500K–1M'],['2026-01-16','VST','买入','看涨期权(行权)','$100K–250K'],['2026-01-16','TEM','买入','看涨期权(行权)','$50K–100K'],['2025-12-30','AAPL','买入','看涨期权','$250K–500K'],['2025-12-30','DIS','卖出','普通股','$1M–5M'],['2025-12-30','PYPL','卖出','普通股','$250K–500K']]},
+ {id:'tuberville',name:'Tommy Tuberville',role:'参议院 · AL',src:'https://www.quiverquant.com/congresstrading/politician/Tommy%20Tuberville-T000278',note:'近期减持个股(大科技/消费)、转向板块ETF(公用/必需消费/医疗)分散配置。',t:[['2025-12-17','XLU','买入','ETF','$15K–50K'],['2025-12-17','XLP','买入','ETF','$15K–50K'],['2025-12-17','XLV','买入','ETF','$15K–50K'],['2025-12-17','AAPL','卖出','普通股','$50K–100K'],['2025-12-17','GOOGL','卖出','普通股','$1K–15K'],['2025-10-07','MSFT','卖出','普通股','$15K–50K'],['2025-10-07','ORCL','卖出','普通股','$15K–50K'],['2025-10-07','PEP','卖出','普通股','$15K–50K']]},
+ {id:'crenshaw',name:'Dan Crenshaw',role:'众议院 · TX(2026初选落败)',src:'https://www.quiverquant.com/congresstrading/politician/Dan%20Crenshaw-C001120',note:'近年几乎不交易；最近一笔为 2023-03 买 SPY；活跃期为 2021-22(大科技/杠杆ETF)。',t:[['2023-03-20','SPY','买入','ETF','$1K–15K'],['2022-10-25','META','买入','普通股','$1K–15K'],['2022-10-25','GOOG','买入','普通股','$1K–15K'],['2022-10-25','AAPL','买入','普通股','$1K–15K'],['2022-10-25','AMZN','买入','普通股','$1K–15K']]},
+];
+let curGuru=null;
+function renderGuruNav(){
+  const nav=document.getElementById('guruNav'); if(!nav)return;
+  const gc=GURUS.map(g=>`<button class="ctrlbtn${curGuru===g.id?' on':''}" data-guru="${g.id}">💼 ${g.name}</button>`).join('');
+  const cc=CONGRESS.map(c=>`<button class="ctrlbtn${curGuru===c.id?' on':''}" data-guru="${c.id}">🏛️ ${c.name}</button>`).join('');
+  nav.innerHTML = gc + ' <i class="ctrlsep"></i> ' + cc;
+}
+async function showGuru(id){
+  curGuru=id; renderGuruNav();
+  const g=GURUS.find(x=>x.id===id); if(g) return showGuruHoldings(g);
+  const c=CONGRESS.find(x=>x.id===id); if(c) return showCongress(c);
+}
+async function showGuruHoldings(g){
+  const body=document.getElementById('guruBody'); if(!body)return;
+  body.innerHTML=`<div class="muted small" style="padding:8px">抓取 ${g.name} 的持仓实时评分…</div>`;
+  const tradable=g.h.filter(x=>!x[3]);
+  const rows=await Promise.all(tradable.map(async x=>{
+    try{ const d=await yahoo(x[0],'1y','1d'); if(!d.closes||d.closes.length<30)return {x,ok:false};
+      const prev=d.closes.length>=2?d.closes[d.closes.length-2]:null, m=computeStock(d.meta,d.closes,null,d.v);
+      return {x, m, dayPct:prev?(m.price-prev)/prev*100:null, ok:true};
+    }catch(e){ return {x,ok:false}; }
+  }));
+  if(curGuru!==g.id) return;
+  rows.sort((a,b)=>(b.x[1]||0)-(a.x[1]||0));   // 按其仓位权重(信念强度)排
+  const untr=g.h.filter(x=>x[3]);
+  const header=`<div class="panel sig" style="margin-bottom:8px;border-color:var(--accent)">
+    <div class="top"><span class="name">💼 ${g.name} <span class="muted small" style="font-weight:400">${g.fund}</span></span><span class="small muted">${g.asof}</span></div>
+    <div class="small" style="margin-top:3px">${g.note}</div>
+    <div class="small muted" style="margin-top:4px">仓位权重=披露快照(${g.asof})、价格/评分实时；披露有滞后，按权重(其信念)排序。<a href="https://${g.src}" target="_blank" rel="noopener" style="color:var(--accent)">来源 ${g.src} ↗</a></div></div>`;
+  const list=rows.map(r=>{
+    const x=r.x;
+    if(!r.ok) return `<div class="panel sig" style="margin-bottom:6px"><div class="top"><span class="name">${x[0]} <span class="muted small" style="font-weight:400">${x[2]||''} · 仓位约${x[1]}%</span></span><span class="small muted">取数失败</span></div></div>`;
+    const m=r.m, color=m.Final>=60?'#3fb950':(m.Final>=45?'#d29922':'#6e7681');
+    return `<div class="panel sig" style="margin-bottom:6px">
+      <div class="top"><span class="name"><a href="#" data-gurutk="${x[0]}" style="color:var(--text)">${x[0]}</a> <span class="muted small" style="font-weight:400">${x[2]||''} · 仓位约 <b>${x[1]}%</b></span></span>
+        <span>$${fmt(m.price,2)} <span class="${cls(r.dayPct)} small">${pct(r.dayPct)}</span> · 综合 <b style="color:${color}">${m.Final}</b></span></div>
+      <div class="small">${potBuyLine(m)}</div>
+      <div class="gauge" style="height:4px;margin-top:4px"><i style="width:${m.Final}%;background:${color}"></i></div></div>`;
+  }).join('');
+  const untrHtml=untr.length?`<div class="small muted" style="margin-top:6px;padding:4px 2px">另含非美股/未上市(无法取价)：${untr.map(x=>x[0]+(x[2]?`(${x[2]})`:'')).join('、')}</div>`:'';
+  body.innerHTML=header+list+untrHtml;
+}
+function showCongress(c){
+  const body=document.getElementById('guruBody'); if(!body)return;
+  const rows=c.t.map(t=>{
+    const buy=/买/.test(t[2]);
+    return `<div class="news-item" style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
+      <span class="muted small" style="min-width:82px">${t[0]}</span>
+      <span class="pill ${buy?'buy':'sell'}">${t[2]}</span>
+      <a href="#" data-gurutk="${t[1]}" style="font-weight:700;color:var(--text)">${t[1]}</a>
+      <span class="small muted">${t[3]||''} · ${t[4]||''}</span></div>`;
+  }).join('');
+  body.innerHTML=`<div class="panel sig" style="margin-bottom:8px;border-color:var(--accent)">
+    <div class="top"><span class="name">🏛️ ${c.name} <span class="muted small" style="font-weight:400">${c.role||''}</span></span></div>
+    <div class="small" style="margin-top:3px">${c.note}</div>
+    <div class="small muted" style="margin-top:4px">国会交易为<b>延迟披露(约30-45天)</b>，金额只给区间——方向参考、非实时跟单。点代码可看本台实时分析。<a href="${c.src}" target="_blank" rel="noopener" style="color:var(--accent)">来源 ↗</a></div></div>
+    ${rows}`;
+}
+document.addEventListener('click',e=>{
+  const gb=e.target.closest('#guruNav [data-guru]'); if(gb){ showGuru(gb.dataset.guru); return; }
+  const gt=e.target.closest('#guruBody [data-gurutk]'); if(gt){ e.preventDefault(); const tk=gt.dataset.gurutk; $('#stkInput').value=tk; openTab('stock'); analyzeStock(tk); return; }
+});
 function refreshTab(tab, force){
   if(!tab)return;
   const now=Date.now();
@@ -2999,6 +3097,7 @@ function refreshTab(tab, force){
   else if(tab==='port') refreshPrices();
   else if(tab==='stock'){ showTheme(curTheme); if(CHARTS.stkChart)refreshChart('stkChart'); }   // 右栏主题/关注随标签刷新
   else if(tab==='chain'){ renderChainNav(); showChainSegment(curChain||CHAINS[0].id); }
+  else if(tab==='gurus'){ renderGuruNav(); showGuru(curGuru||GURUS[0].id); }
   else if(tab==='myk') renderMyKlines();
   else if(tab==='bloggers') loadBloggers();
 }
@@ -3116,6 +3215,7 @@ function boot(){
   renderManualCards();
   renderStkQuick();
   renderThemeTabs();
+  renderGuruNav();
   mountChart('dashChart','dashChartCtrl','^GSPC',{range:'1y',interval:'1d',type:'candle',ma:200,dec:0,
     symbols:[['^GSPC','标普'],['^NDX','纳指'],['^DJI','道指'],['^VIX','VIX'],['QQQ','QQQ']],
     ovOptions:[['','无叠加'],['^VIX','叠VIX'],['^TNX','叠10Y'],['^NDX','叠纳指']]});
