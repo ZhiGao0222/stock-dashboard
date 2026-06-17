@@ -1081,11 +1081,11 @@ async function loadIndicators(){
   // ========== 估值面：便宜吗（每项=好买点概率 0..100）==========
   const val={};
   val.fg  = fg!=null? 100-fg : null;                       // 越恐慌越便宜
-  val.vix = lin(vix,14,40);                                // VIX 高=恐慌=便宜
-  val.rsi = rsiBlend!=null? lin(55-rsiBlend,0,30) : null;  // RSI 低=超卖
-  val.dd  = dd!=null? lin(-dd,0,0.20) : null;              // 回撤越深越便宜
-  val.ma  = belowMa!=null? lin(belowMa,-0.05,0.15) : null; // 在200线下方=便宜
-  val.breadth = BREADTH!=null? lin(60-BREADTH,0,45) : null;// 广度低=多数股破位=洗盘=便宜
+  val.vix = lin(vix,12,38);                                // VIX 12平静(不便宜)→38恐慌(便宜)·全程分档
+  val.rsi = rsiBlend!=null? lin(70-rsiBlend,0,40) : null;  // RSI 30超卖(便宜)→70强势(不便宜)·全程分档,仅极端才到0/100
+  val.dd  = dd!=null? lin(-dd,0,0.22) : null;              // 回撤越深越便宜
+  val.ma  = belowMa!=null? lin(belowMa,-0.15,0.15) : null; // 相对200线 ±15% 分档(线上方=不便宜但非0)
+  val.breadth = BREADTH!=null? lin(80-BREADTH,0,60) : null;// 广度80%普涨(不便宜)→20%洗盘(便宜)·全程分档
   val.pcce= pc!=null? lin(pc,0.8,1.4) : null;              // 可选手填
   const WV=CFG.wVal;
   const Value = wAvg([[val.fg,WV.fg],[val.vix,WV.vix],[val.rsi,WV.rsi],[val.dd,WV.dd],[val.ma,WV.ma],[val.breadth,WV.breadth],[val.pcce,0.10]]);
@@ -1923,8 +1923,8 @@ function computeStock(meta, closes, target, volumes){
   const mean1y=closes.reduce((a,b)=>a+b,0)/closes.length, vsMean=(price-mean1y)/mean1y;
   const vol=stdAnnual(closes,60);
   let peak=closes[0],mdd=0; for(const c of closes){ if(c>peak)peak=c; const dr=(c-peak)/peak; if(dr<mdd)mdd=dr; }
-  const V={rsi:lin(55-rsiD,0,30), dd:dd52!=null?lin(-dd52,0,0.30):null,
-    ma:ma200?lin((ma200-price)/ma200,-0.05,0.20):null, pos:pos52!=null?lin(0.6-pos52,-0.3,0.5):null};
+  const V={rsi:lin(70-rsiD,0,40), dd:dd52!=null?lin(-dd52,0,0.30):null,
+    ma:ma200?lin((ma200-price)/ma200,-0.15,0.20):null, pos:pos52!=null?lin(0.7-pos52,-0.3,0.6):null};
   const Value=wAvg([[V.rsi,1],[V.dd,1],[V.ma,1],[V.pos,1]]);
   const T={slope:(rsiD!=null&&rsiD5!=null)?lin(rsiD-rsiD5,-3,10):null, ma10:ma10?lin((price-ma10)/ma10,-0.05,0.03):null,
     ma50:ma50?lin((price-ma50)/ma50,-0.08,0.05):null, dir:(ma200&&ma200_20)?lin((ma200-ma200_20)/ma200_20,-0.02,0.04):null};
