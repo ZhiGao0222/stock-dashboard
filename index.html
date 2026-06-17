@@ -2794,34 +2794,43 @@ function _blogTypeBadge(t){ t=t||'';
   if(/分析|科普|方法|行业|公司|研究|教学/.test(t)) return '<span class="pill" title="公司/行业分析或方法论，偏研究、非直接买卖信号">⚪ 分析/科普</span>';
   return t?`<span class="pill">${t}</span>`:'<span class="pill" style="opacity:.6">未分类</span>';
 }
-/* 对她点名的票，用本台实时数据给出客观「当前买点」核对(与她的观点分开) */
+/* 推荐人(博主)自己的建议文案：优先用采集到的 rec，否则按 type 兜底 */
+function _recText(p){
+  if(p && p.rec) return p.rec;
+  const t=(p&&p.type)||'';
+  if(/看涨|买入|看多|加仓|建仓/.test(t)) return '看多 · 建议关注（她的看法）';
+  if(/复盘|赞许|招牌|回顾|旧/.test(t)) return '回顾/重申旧观点 · 非新入场建议';
+  if(/止盈|看空|减仓/.test(t)) return '看空/减仓 · 警示';
+  if(/分析|科普|方法|行业|公司|研究|教学/.test(t)) return '研究/科普 · 无明确买卖建议';
+  return t||'—';
+}
+/* 对她点名的票，用本台实时数据给出客观「系统买点」(与推荐人建议分开摆) */
 async function _fillBlogVerdicts(){
   const tks=[...new Set([...document.querySelectorAll('#blogFeed .blog-verdict[data-vtk]')].map(s=>s.dataset.vtk))];
   await Promise.all(tks.map(async tk=>{
     let html='<span class="muted">取数失败(可能非美股/代码无效)</span>';
     try{ const d=await yahoo(tk,'1y','1d'); if(d.closes&&d.closes.length>=30){ const m=computeStock(d.meta,d.closes,null,d.v), bp=buyPointOf(m), pot=potentialOf(m);
-      html=`<b style="color:${bp.color}">当前买点 ${bp.lvl}</b> · 潜力 ${pot.lvl}${pot.up!=null?`(${pot.up>=0?'+':''}${Math.round(pot.up)}%)`:''} · 综合 ${m.Final}`; } }catch(e){}
-    document.querySelectorAll('#blogFeed .blog-verdict[data-vtk="'+tk+'"]').forEach(s=>s.innerHTML='🔎 工具核对 <b>'+tk+'</b>：'+html);
+      html=`<b style="color:${bp.color}">${bp.lvl}</b> · 潜力 ${pot.lvl}${pot.up!=null?`(${pot.up>=0?'+':''}${Math.round(pot.up)}%)`:''} · 综合 ${m.Final}`; } }catch(e){}
+    document.querySelectorAll('#blogFeed .blog-verdict[data-vtk="'+tk+'"]').forEach(s=>s.innerHTML='<b>'+tk+'</b> '+html);
   }));
 }
 function renderBloggerFeed(b){
   const feed=$('#blogFeed'); if(!feed||!b)return;
   const ov=(b.overview?`<b>💡 本轮要点</b> ${b.overview}`:'')+((b.tickers&&b.tickers.length)?`<div style="margin-top:6px"><span class="muted">提到的票：</span>${b.tickers.map(t=>`<a href="#" data-stk="${t}" class="pill buy" style="margin:0 4px 4px 0;display:inline-block">${t}</a>`).join('')}</div>`:'');
   const head=`<div class="panel" style="margin-bottom:8px"><div style="font-weight:700">${b.name||b.id} <span class="muted small" style="font-weight:400">${b.handle||''}${b.reddit?' · '+b.reddit:''}</span></div>${b.bio?`<div class="small muted" style="margin-top:2px">${b.bio}</div>`:''}${ov?`<div class="small" style="margin-top:6px;line-height:1.6">${ov}</div>`:''}
-    <div class="small muted" style="margin-top:6px;line-height:1.5">类型：🟢看涨/买入(可能新入场) · 🔵复盘/赞许(回顾旧观点·非新点) · ⚪分析/科普。<b>「🔎工具核对」</b>是本台用实时数据对她点名的票给出的<b>客观当前买点</b>，跟她的观点分开看——她看好≠现在就是好买点。</div></div>`;
+    <div class="small muted" style="margin-top:6px;line-height:1.5">每条给<b>两个判断分开看</b>：<b style="color:#d2a8ff">🗣 推荐人建议</b>(博主自己怎么说) ＋ <b style="color:#58a6ff">🔎 系统买点</b>(本台实时数据的客观买点) —— <b>她看好 ≠ 系统说现在好买</b>，自己权衡。类型：🟢看涨/买入 · 🔵复盘/赞许(非新入场) · ⚪分析/科普。</div></div>`;
   const posts=(b.posts||[]).map(p=>{
     const bull=(p.bullish||[]).map(t=>`<a href="#" data-stk="${t}" class="pill buy">${t}</a>`).join(' ');
     const chain=(p.chain||[]).map(c=>`<span class="pill">${c}</span>`).join(' ');
-    const verdicts=(p.bullish||[]).map(t=>`<div class="small" style="margin-top:3px"><span class="blog-verdict" data-vtk="${t}">🔎 工具核对 <b>${t}</b>：核对中…</span></div>`).join('');
+    const verdicts=(p.bullish||[]).map(t=>`<div class="small" style="margin-top:2px;padding-left:6px"><span class="blog-verdict" data-vtk="${t}"><b>${t}</b> 核对中…</span></div>`).join('');
     const more=p.detail?`<div class="blog-more small" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;line-height:1.6">${p.detail}${p.url?`<br><a href="${p.url}" target="_blank" rel="noopener">查看原文 ↗</a>`:''}</div><a href="#" class="small blog-exp" style="display:inline-block;margin-top:6px">展开完整分析 ▾</a>`:(p.url?`<a href="${p.url}" target="_blank" rel="noopener" class="small" style="display:inline-block;margin-top:6px">查看原文 ↗</a>`:'');
     return `<div class="panel" style="margin-bottom:8px">
       <div class="row small muted" style="justify-content:space-between;align-items:center"><span>${p.source||'X'} · ${_blogTypeBadge(p.type)}</span><span>${p.time||''}</span></div>
       <div style="font-weight:600;margin:5px 0">${p.title||''}</div>
       ${p.key?`<div class="small" style="margin-top:4px"><b style="color:var(--accent)">🎯 重点</b> ${p.key}</div>`:''}
-      ${bull?`<div class="small" style="margin-top:4px"><b class="pos">↗ 她看好</b> ${bull}</div>`:''}
-      ${verdicts}
-      ${p.potential?`<div class="small" style="margin-top:4px"><b style="color:var(--amber)">📈 她看的潜力</b> ${p.potential}</div>`:''}
-      ${chain?`<div class="small" style="margin-top:4px"><b style="color:#58a6ff">🔗 产业链</b> ${chain}</div>`:''}
+      <div class="small" style="margin-top:6px;border-left:2px solid #d2a8ff;padding-left:8px"><b style="color:#d2a8ff">🗣 推荐人建议</b> ${_recText(p)}${bull?` · <span class="muted">看好</span> ${bull}`:''}${p.potential?`<br><span class="muted">她看的潜力：</span>${p.potential}`:''}</div>
+      ${verdicts?`<div class="small" style="margin-top:6px;border-left:2px solid #58a6ff;padding-left:8px"><b style="color:#58a6ff">🔎 系统买点</b> <span class="muted">本台实时数据·客观，与她的看法分开</span>${verdicts}</div>`:''}
+      ${chain?`<div class="small" style="margin-top:6px"><b style="color:#58a6ff">🔗 产业链</b> ${chain}</div>`:''}
       ${more}
     </div>`;
   }).join('') || '<div class="muted small" style="padding:8px">该博主暂无采集到的观点。</div>';

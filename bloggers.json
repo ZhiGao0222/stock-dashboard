@@ -1,5 +1,5 @@
 {
-  "updated": "2026-06-17T01:55:00-08:00",
+  "updated": "2026-06-17T13:10:00-08:00",
   "bloggers": [
     {
       "id": "serenity",
@@ -14,42 +14,46 @@
           "time": "2026-06",
           "source": "X",
           "type": "看涨/加仓",
+          "rec": "看涨 · 建议关注/加仓（她从 $28 起持续向上加仓）",
           "title": "$AAOI 自 $28 一路加仓——800G/1.6T 光模块需求太猛，执行到位有望翻倍",
           "key": "押注 AI 光互联需求爆发；AAOI 卡位 MSFT Maia / AMZN Trainium 上量的光模块链。",
           "bullish": ["AAOI"],
-          "potential": "高 · 他本人称执行到位可能翻倍~三倍（其个人观点·非预测·小盘高波动）",
+          "potential": "高 · 她本人称执行到位可能翻倍~三倍（其个人观点·非预测·小盘高波动）",
           "chain": ["光通信/光学"],
-          "detail": "原话大意：$AAOI 是他从 $28 起不断向上加仓的名字之一，认为 800G/1.6T 光模块需求太大、公司执行到位就可能翻倍甚至三倍。这正是你持仓里的 AAOI——他明确看多；但请看下方「工具核对」对当前买点的客观判断，别只因他看好就追高。",
+          "detail": "原话大意：$AAOI 是他从 $28 起不断向上加仓的名字之一，认为 800G/1.6T 光模块需求太大、公司执行到位就可能翻倍甚至三倍。这正是你持仓里的 AAOI——她明确看多；但请看「系统买点」对当前买点的客观判断，别只因她看好就追高。",
           "url": "https://x.com/aleabitoreddit"
         },
         {
           "time": "2026-06-11",
           "source": "X",
           "type": "看涨/分析",
+          "rec": "看好 CPO 方向（首选 Foci/SIVE；美股受益 LITE、AAOI）",
           "title": "CPO 卡脖子：押 Foci(台股3363)/SIVE，称是 NVDA、TSM 光程序的瓶颈",
           "key": "共封装光学(CPO)上量，连接器/光引擎是瓶颈；并把 LITE 放进 TPU/OCS 受益链、AAOI 进 MSFT Maia/AMZN Trainium 链，认为 InP 或像 HBM 一样成瓶颈。",
           "bullish": ["LITE", "AAOI"],
           "potential": "中高 · CPO/光互联 2026 上量",
           "chain": ["光通信/光学", "代工/封装"],
-          "detail": "6/11 观点：看好 CPO 方向的 Foci（ITRI 分拆、Himax 的 CPO 伙伴、台股3363）与 SIVE（Sivers，美股仅 OTC SIVEF，Robinhood 不可买）——认为它们是 NVDA/TSM 光程序的瓶颈。美股可买的相关受益：LITE(光器件)、AAOI(光模块)。注：Foci/SIVE 非美股主板，工具核对取不到价属正常。",
+          "detail": "6/11 观点：看好 CPO 方向的 Foci（ITRI 分拆、Himax 的 CPO 伙伴、台股3363）与 SIVE（Sivers，美股仅 OTC SIVEF，Robinhood 不可买）——认为它们是 NVDA/TSM 光程序的瓶颈。美股可买的相关受益：LITE(光器件)、AAOI(光模块)。注：Foci/SIVE 非美股主板，系统买点取不到价属正常。",
           "url": "https://x.com/aleabitoreddit"
         },
         {
           "time": "2026-06-16",
           "source": "X",
           "type": "复盘/招牌",
+          "rec": "复盘成名旧仓 · 已大涨，非新入场建议",
           "title": "AXTI（InP 磷化铟衬底）——招牌成名作，$12 喊到 $70",
           "key": "InP 衬底是光通信/激光器的卡脖子材料，全球产能高度集中、有定价权。",
           "bullish": ["AXTI"],
           "potential": "高 · 1.6T 光模块升级 + InP 供给紧张",
           "chain": ["光通信/光学", "半导体材料"],
-          "detail": "他把 InP 衬底视为光模块上行周期里被忽视的根部环节——下游 1.6T/CPO 放量需要更多 InP 激光，而衬底供给被少数厂家垄断、扩产慢。早期在 r/wallstreetbets 以 u/AleaBito 发表详细论文，$12 建仓、最高约 +1000%。这是成名旧仓(回顾性质)，不等于现在是好买点——看下方工具核对。也是你持仓里的 AXTI。",
+          "detail": "他把 InP 衬底视为光模块上行周期里被忽视的根部环节——下游 1.6T/CPO 放量需要更多 InP 激光，而衬底供给被少数厂家垄断、扩产慢。早期在 r/wallstreetbets 以 u/AleaBito 发表详细论文，$12 建仓、最高约 +1000%。这是成名旧仓(回顾性质)，不等于现在是好买点——看「系统买点」。也是你持仓里的 AXTI。",
           "url": "https://x.com/aleabitoreddit"
         },
         {
           "time": "背景",
           "source": "简介",
           "type": "方法论/分析",
+          "rec": "方法论分享 · 无具体买卖建议",
           "title": "打法：逆向拆解供应链，找别人没盯的「瓶颈/命门」",
           "key": "自述 AI/半导体供应链分析、前 RISC-V 基金会与 AI 研究者；找不可替代、产能集中、技术壁垒高、有定价权的隐形冠军。",
           "bullish": [],
