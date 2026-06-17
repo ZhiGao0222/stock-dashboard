@@ -2317,6 +2317,8 @@ function renderStockDetail(tk,m,target){
 /* 主题板块：用户聚焦板块(AI/物理AI/算力/存储/光学/半导体/能源/航天)靠前。focus:true=重点关注。代码均经 Yahoo 实测有效(2026-06)。*/
 const THEMES={
   watch:{name:'⭐ 特别关注', tickers:null},
+  mag7:{name:'🧲 七巨头 Mag7', focus:true, note:'美股七巨头/大科技：AAPL/MSFT/GOOGL/AMZN/NVDA/META/TSLA——AI 浪潮核心权重股、标普/纳指的发动机。点任一只可详细分析。', tickers:['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA']},
+  bigtech:{name:'💻 大科技+', note:'更广的大型科技：七巨头 + 博通/甲骨文/奈飞/AMD/Palantir/Salesforce/台积电 等权重科技股。', tickers:['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AVGO','ORCL','NFLX','AMD','PLTR','CRM','TSM']},
   compute:{name:'🖥️ 算力', focus:true, note:'AI基建超级周期：训练/推理GPU(NVDA)+定制ASIC(AVGO/MRVL)+AI云(CRWV)+网络(ANET)。GPU依赖TSM代工与HBM供给。', tickers:['NVDA','AVGO','AMD','MRVL','TSM','ARM','ALAB','CRDO','ANET','SMCI','CRWV']},
   optical:{name:'🔆 光通信光学', focus:true, note:'AI集群内/间互联：800G→1.6T光模块与CPO共封装大周期。DSP(MRVL/AVGO/CRDO)+光器件(LITE/COHR/AAOI)+激光(LASR/MTSI)+代工组装(FN)。', tickers:['LITE','COHR','MRVL','AVGO','CRDO','FN','LASR','MTSI','AAOI','POET','LPTH','VIAV','AXTI']},
   storage:{name:'💾 存储', focus:true, note:'AI存储超级周期：HBM/企业级NAND/高容HDD结构性供不应求(2026 SNDK/MU/STX大涨)。', tickers:['MU','SNDK','WDC','STX','PSTG','NTAP']},
