@@ -171,6 +171,7 @@
     <button class="tab" data-tab="chain">🔗 产业链</button>
     <button class="tab" data-tab="market">🌐 市场动向</button>
     <button class="tab" data-tab="news">📰 全球新闻</button>
+    <button class="tab" data-tab="serenity">📡 Serenity</button>
     <button class="tab" data-tab="port">💼 我的持仓</button>
     <button class="tab" data-tab="myk">📈 我的K线</button>
   </nav>
@@ -340,6 +341,23 @@
       <div class="small muted">📊 当前新闻板块情绪（统计所有标题·仅供方向参考）— 加载中…</div>
     </div>
     <div class="grid news-grid" id="newsGrid" style="flex:1 1 auto;min-height:0"></div>
+  </section>
+
+  <!-- ===================== SERENITY 言论追踪 ===================== -->
+  <section id="serenity">
+    <div class="panel" style="flex:0 0 auto">
+      <div class="row" style="align-items:center;gap:10px">
+        <span style="width:34px;height:34px;border-radius:50%;background:var(--accent);display:grid;place-items:center;font-weight:700;color:#fff;flex:0 0 auto">S</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700">Serenity <span class="muted small" style="font-weight:400">@aleabitoreddit · u/AleaBito</span></div>
+          <div class="small muted">AI/半导体供应链「瓶颈」分析 · 每30分云端汇集公开言论并AI总结 · 非投资建议</div>
+        </div>
+        <span class="tag" id="serenityUpdated" style="color:var(--muted)"></span>
+        <button class="btn" id="serenityReload">↻ 刷新</button>
+      </div>
+      <div id="serenityOverview" class="small" style="margin-top:8px;line-height:1.6"></div>
+    </div>
+    <div class="scrolly" style="flex:1 1 auto;min-height:0;margin-top:10px"><div id="serenityFeed"><div class="muted small" style="padding:10px">加载中…</div></div></div>
   </section>
 
   <!-- ===================== PORTFOLIO ===================== -->
@@ -2752,6 +2770,44 @@ function redrawVisibleCharts(){
     if(el && el.clientHeight>20 && !CHARTS[id]){ drawLine(id,_chartCache[id].values,_chartCache[id].opts); } }
   if(typeof paintChainGraph==='function' && document.querySelector('#chain.active')) paintChainGraph();   // 产业链关系图按新尺寸重绘
 }
+/* =================================================================
+   📡 Serenity 言论追踪：读同源 serenity.json(云端每30分采集+总结写入)，渲染可展开观点卡
+   ================================================================= */
+async function loadSerenity(){
+  const feed=$('#serenityFeed'); if(!feed)return;
+  let data=null;
+  try{ const r=await fetch('serenity.json?cb='+Date.now(),{cache:'no-store'}); if(r.ok) data=await r.json(); }catch(e){}
+  const ov=$('#serenityOverview'), up=$('#serenityUpdated');
+  if(!data||!Array.isArray(data.posts)||!data.posts.length){
+    feed.innerHTML='<div class="note" style="margin:8px;line-height:1.6">还没有采集到内容。每 30 分钟的云端任务跑过一次后，这里会出现 Serenity 的观点卡。<br><span class="muted">首次需在侧边栏 <b>Scheduled</b> 对 <b>serenity-tracker</b> 点一次 <b>Run now</b> 授权联网工具。</span></div>';
+    if(ov)ov.innerHTML=''; if(up)up.textContent=''; return;
+  }
+  if(up)up.textContent = data.updated? '更新于 '+new Date(data.updated).toLocaleString('zh-CN') : '';
+  if(ov)ov.innerHTML = (data.overview?`<b>💡 本轮要点</b> ${data.overview}`:'') +
+    ((data.tickers&&data.tickers.length)?`<div style="margin-top:6px"><span class="muted">提到的票：</span>${data.tickers.map(t=>`<a href="#" data-stk="${t}" class="pill buy" style="margin:0 4px 4px 0;display:inline-block">${t}</a>`).join('')}</div>`:'');
+  feed.innerHTML = data.posts.map(p=>{
+    const bull=(p.bullish||[]).map(t=>`<a href="#" data-stk="${t}" class="pill buy">${t}</a>`).join(' ');
+    const chain=(p.chain||[]).map(c=>`<span class="pill">${c}</span>`).join(' ');
+    const more=p.detail?`<div class="serenity-more small" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;line-height:1.6">${p.detail}${p.url?`<br><a href="${p.url}" target="_blank" rel="noopener">查看原文 ↗</a>`:''}</div><a href="#" class="small serenity-exp" style="display:inline-block;margin-top:6px">展开完整分析 ▾</a>`:(p.url?`<a href="${p.url}" target="_blank" rel="noopener" class="small" style="display:inline-block;margin-top:6px">查看原文 ↗</a>`:'');
+    return `<div class="panel" style="margin-bottom:8px">
+      <div class="row small muted" style="justify-content:space-between"><span>${p.source||'X'} · 观点</span><span>${p.time||''}</span></div>
+      <div style="font-weight:600;margin:5px 0">${p.title||''}</div>
+      ${p.key?`<div class="small" style="margin-top:4px"><b style="color:var(--accent)">🎯 重点</b> ${p.key}</div>`:''}
+      ${bull?`<div class="small" style="margin-top:4px"><b class="pos">↗ 利好</b> ${bull}</div>`:''}
+      ${p.potential?`<div class="small" style="margin-top:4px"><b style="color:var(--amber)">📈 潜力</b> ${p.potential}</div>`:''}
+      ${chain?`<div class="small" style="margin-top:4px"><b style="color:#58a6ff">🔗 产业链</b> ${chain}</div>`:''}
+      ${more}
+    </div>`;
+  }).join('');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#serenity'))return;
+  const stk=e.target.closest('#serenity [data-stk]'); if(stk){ e.preventDefault(); $('#stkInput').value=stk.dataset.stk; openTab('stock'); analyzeStock(stk.dataset.stk); return; }
+  const ex=e.target.closest('.serenity-exp'); if(ex){ e.preventDefault(); const m=ex.previousElementSibling;
+    if(m){ const open=m.style.display!=='none'; m.style.display=open?'none':'block'; ex.textContent=open?'展开完整分析 ▾':'收起 ▴'; } }
+});
+const _srl=$('#serenityReload'); if(_srl)_srl.onclick=()=>{ lastLoad.serenity=0; loadSerenity(); };
+
 /* 每个标签页都按当前实时刷新：打开即刷新(20秒内不重复)，激活标签每隔 refreshSec 自动刷新 */
 const lastLoad={};
 function activeTab(){ return document.querySelector('section.active')?.id; }
@@ -2767,6 +2823,7 @@ function refreshTab(tab, force){
   else if(tab==='stock'){ showTheme(curTheme); if(CHARTS.stkChart)refreshChart('stkChart'); }   // 右栏主题/关注随标签刷新
   else if(tab==='chain'){ renderChainNav(); showChainSegment(curChain||CHAINS[0].id); }
   else if(tab==='myk') renderMyKlines();
+  else if(tab==='serenity') loadSerenity();
 }
 function openTab(tab){
   if(!tab)return;
