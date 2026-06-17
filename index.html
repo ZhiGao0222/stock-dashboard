@@ -247,7 +247,7 @@
         <input id="stkInput" placeholder="代码，如 AAPL / NVDA / TSLA" style="text-transform:uppercase;min-width:200px" />
         <input id="stkTarget" type="number" step="any" placeholder="目标价(可选)" style="width:130px" />
         <button class="btn primary" id="stkBtn">分析</button>
-        <button class="btn" id="stkWatch" style="display:none">★ 加入特别关注</button>
+        <button class="btn" id="stkWatch" style="display:none">★ 加入观察</button>
         <span id="stkQuick" class="row" style="gap:4px"></span>
         <span class="spacer"></span>
         <span class="small muted">技术面+相对估值+风险，不含基本面，仅供参考</span>
@@ -255,14 +255,14 @@
     </div>
     <div style="flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1.6fr 1fr;gap:10px">
       <!-- 左：单股详细分析 -->
-      <div id="stkResult" class="scrolly" style="min-height:0"><div class="panel muted">在上方输入任意代码点「分析」；右侧可选主题板块看实时评分排名。分析后可在结果里「☆加入特别关注」，或用右栏「+关注」。</div></div>
-      <!-- 右：主题板块排名 + 特别关注列表（恢复原布局） -->
+      <div id="stkResult" class="scrolly" style="min-height:0"><div class="panel muted">在上方输入任意代码点「分析」；右侧可选主题板块看实时评分排名。分析后可在结果里加入「👀 观察」或「🎯 重点」，或用右栏「+关注」。</div></div>
+      <!-- 右：主题板块排名 + 观察中/重点关注列表 -->
       <div class="panel scrolly" style="display:flex;flex-direction:column;min-height:0">
-        <h3 style="font-size:13px;margin-bottom:6px">📊 主题板块 / ⭐ 特别关注 <span class="tag" id="watchUpdated"></span></h3>
+        <h3 style="font-size:13px;margin-bottom:6px">📊 主题板块 / 👀 观察 · 🎯 重点 <span class="tag" id="watchUpdated"></span></h3>
         <div id="themeTabs" style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px"></div>
         <div class="small muted" id="themeNote" style="margin-bottom:6px;line-height:1.5"></div>
         <div class="row" id="watchAddRow" style="gap:5px;margin-bottom:8px">
-          <input id="watchAdd" placeholder="加代码到特别关注，如 LITE" style="text-transform:uppercase;flex:1;min-width:0">
+          <input id="watchAdd" placeholder="加代码到观察中，如 LITE" style="text-transform:uppercase;flex:1;min-width:0">
           <button class="btn small" id="watchAddBtn">+ 关注</button>
         </div>
         <div id="stkList" style="flex:1 1 auto;min-height:0"></div>
@@ -478,7 +478,7 @@
   <h3 style="margin-top:0">🎯 持仓配置 / 再平衡优化</h3>
   <p class="small muted" style="margin:0 0 8px;line-height:1.5">设目标配置%，对比当前持仓→给出到目标的买卖指令（你在 Robinhood 手动执行）。含集中度、杠杆敞口、板块暴露、加权波动评估。<b>非投资建议</b>。</p>
   <div class="row" style="flex-wrap:wrap;gap:5px;margin-bottom:6px">
-    <span class="small muted">🧮 智能建议(基于 持仓+特别关注·反波动率分散):</span>
+    <span class="small muted">🧮 智能建议(基于 持仓+关注·反波动率分散):</span>
     <button class="btn small" data-suggest="conservative">保守</button>
     <button class="btn small primary" data-suggest="balanced">平衡</button>
     <button class="btn small" data-suggest="aggressive">进取</button>
@@ -1754,7 +1754,7 @@ function _applyCaps(items,maxW){
 async function suggestAllocation(level){
   const box=$('#opt_result'); const P=SUGGEST_PARAMS[level]||SUGGEST_PARAMS.balanced;
   const tks=[...new Set([...PORT.positions.map(p=>p.ticker), ...WATCH.map(w=>w.ticker)])];
-  if(!tks.length){ box.innerHTML='<div class="note">先在「我的持仓」录入持仓，或在「⭐特别关注」加几只股票，再生成建议配比。</div>'; return; }
+  if(!tks.length){ box.innerHTML='<div class="note">先在「我的持仓」录入持仓，或在「👀观察/🎯重点」加几只股票，再生成建议配比。</div>'; return; }
   box.innerHTML='<div class="muted small">读取各标的波动率、计算建议配比…</div>';
   const data={};
   await Promise.all(tks.map(async tk=>{ try{ const d=await yahoo(tk,'1y','1d'); data[tk]=computeStock(d.meta,d.closes,null,d.v); }catch(e){ data[tk]=null; } }));
@@ -1776,7 +1776,7 @@ async function suggestAllocation(level){
   _applyCaps(items, Math.min(P.maxW, budget||P.maxW));
   const r=_roundTo100(items, budget).filter(x=>x.w>0);
   TARGET=[...lockedItems, ...r.map(x=>({ticker:x.t,pct:x.w}))]; saveTarget(); renderOptTargets();
-  box.innerHTML=`<div class="note" style="line-height:1.6">🧮 已生成<b>${P.label}</b>建议配比（持仓+特别关注 ${valid.length+lockedItems.length} 只${lockedItems.length?`，🔒锁定 ${lockedItems.length} 只保持不变`:''}）。<br>
+  box.innerHTML=`<div class="note" style="line-height:1.6">🧮 已生成<b>${P.label}</b>建议配比（持仓+关注 ${valid.length+lockedItems.length} 只${lockedItems.length?`，🔒锁定 ${lockedItems.length} 只保持不变`:''}）。<br>
     方法：<b>反波动率加权</b>(波动越低→权重越高，控制风险)，单仓≤${P.maxW}%，杠杆ETF≤${P.lev}%${lockedItems.length?`；锁定的 ${lockedItems.map(t=>t.ticker).join('/')} 不动，其余在 ${fmt(budget,0)}% 内调配`:''}。<br>
     ⚠️ <b>风险分散</b>建议，<b>非收益预测</b>。可手改任意%，再点"计算再平衡"看买卖指令。</div>`;
 }
@@ -2229,7 +2229,7 @@ async function analyzeStock(tk,target){
 function renderStockDetail(tk,m,target){
   const {price,name,rsiD,rsiD5,ma10,ma50,ma200,ma200dir,lo20,hi52,dd52,pos52,vol,mdd,V,T,Value,Trend,Timing,Under,Risk,Final,upHi,upTgt,macd:macdInfo,boll,volStat}=m;
   checkAlerts(tk, price, Final);
-  const watching=WATCH.some(w=>w.ticker===tk);
+  const _wItem=WATCH.find(w=>w.ticker===tk), wtier=_wItem?tierOf(_wItem):null;
   const rec=holdRec(m);
   const pot=potentialOf(m), bpt=buyPointOf(m);
   const cheapTxt=Value>=58?'估值便宜':(Value>=45?'估值中性':'估值不便宜'), momTxt=Trend>=58?'动量在涨':(Trend>=45?'动量企稳':'动量偏弱');
@@ -2251,7 +2251,8 @@ function renderStockDetail(tk,m,target){
   $('#stkResult').innerHTML=`
     <div class="panel" style="margin-bottom:10px;border-color:var(--accent)">
       <h3>${name||tk} <span class="tag">${tk}</span> <span class="tag">$${fmt(price,2)}</span>
-        <button class="btn small" data-watchtoggle="${tk}" style="margin-left:auto;padding:3px 9px">${watching?'★ 已在特别关注':'☆ 加入特别关注'}</button>
+        <button class="btn small" data-wtierset="watch" data-tk="${tk}" style="margin-left:auto;padding:3px 9px${wtier==='watch'?';background:var(--accent);color:#fff':''}">${wtier==='watch'?'✓ 观察中':'👀 观察'}</button>
+        <button class="btn small" data-wtierset="focus" data-tk="${tk}" style="padding:3px 9px${wtier==='focus'?';background:var(--accent);color:#fff':''}">${wtier==='focus'?'✓ 重点关注':'🎯 重点'}</button>
         <button class="btn small" data-alertfor="${tk}" style="padding:3px 9px">🔔 预警${(ALERTS[tk]&&ALERTS[tk].length)?'·'+ALERTS[tk].length:''}</button></h3>
       <!-- 最直观两项：潜力 + 当前买点 -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 12px">
@@ -2336,7 +2337,8 @@ function renderStockDetail(tk,m,target){
 /* ---- 主题板块（联网调研的真实当前龙头 + 催化剂，2026-06）+ 长期关注 ---- */
 /* 主题板块：用户聚焦板块(AI/物理AI/算力/存储/光学/半导体/能源/航天)靠前。focus:true=重点关注。代码均经 Yahoo 实测有效(2026-06)。*/
 const THEMES={
-  watch:{name:'⭐ 特别关注', tickers:null},
+  watch:{name:'👀 观察中', tickers:null, wl:'watch'},
+  focus:{name:'🎯 重点关注', tickers:null, wl:'focus'},
   mag7:{name:'🧲 七巨头 Mag7', focus:true, note:'美股七巨头/大科技：AAPL/MSFT/GOOGL/AMZN/NVDA/META/TSLA——AI 浪潮核心权重股、标普/纳指的发动机。点任一只可详细分析。', tickers:['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA']},
   bigtech:{name:'💻 大科技+', note:'更广的大型科技：七巨头 + 博通/甲骨文/奈飞/AMD/Palantir/Salesforce/台积电 等权重科技股。', tickers:['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AVGO','ORCL','NFLX','AMD','PLTR','CRM','TSM']},
   compute:{name:'🖥️ 算力', focus:true, note:'AI基建超级周期：训练/推理GPU(NVDA)+定制ASIC(AVGO/MRVL)+AI云(CRWV)+网络(ANET)。GPU依赖TSM代工与HBM供给。', tickers:['NVDA','AVGO','AMD','MRVL','TSM','ARM','ALAB','CRDO','ANET','SMCI','CRWV']},
@@ -2446,11 +2448,14 @@ function renderThemeTabs(){
   $('#themeTabs').innerHTML=Object.entries(THEMES).map(([k,v])=>
     `<button class="tab${k===curTheme?' active':''}" data-theme="${k}" style="padding:4px 9px;font-size:12px">${v.name}</button>`).join('');
 }
+function curTier(){ return THEMES[curTheme]?THEMES[curTheme].wl:null; }
 async function showTheme(key){
   curTheme=key; renderThemeTabs();
-  $('#watchAddRow').style.display = key==='watch'?'':'none';
-  $('#themeNote').innerHTML = (key!=='watch'&&THEMES[key].note)?`💡 ${THEMES[key].note}　<span style="opacity:.7">按综合评分排名，点"详细分析"看完整数据。</span>`:'';
-  if(key==='watch'){ renderWatchlist(); return; }
+  const wl=THEMES[key].wl;
+  $('#watchAddRow').style.display = wl?'':'none';
+  if(wl){ $('#watchAdd').placeholder = (wl==='focus'?'加代码到重点关注，如 LITE':'加代码到观察中，如 LITE'); }
+  $('#themeNote').innerHTML = (!wl&&THEMES[key].note)?`💡 ${THEMES[key].note}　<span style="opacity:.7">按综合评分排名，点"详细分析"看完整数据。</span>`:'';
+  if(wl){ renderWatchlist(); return; }
   const th=THEMES[key], list=$('#stkList');
   list.innerHTML=`<div class="muted small" style="padding:8px">抓取 ${th.tickers.length} 只股票并排名中…</div>`;
   const rows=await Promise.all(th.tickers.map(async tk=>{
@@ -2492,33 +2497,47 @@ function renderThemeList(){
   }).join('');
 }
 let stockFetched=false;
-async function addWatch(tk){
+const TIER_LABEL={watch:'观察中', focus:'重点关注'};
+function tierOf(w){ return (w&&w.tier==='focus')?'focus':'watch'; }   // 旧数据无 tier=观察中
+// 把某只设到指定分组：已在该组→移除；在另一组→切换；不在→新增
+async function setTier(tk, tier){
   tk=(tk||'').trim().toUpperCase(); if(!tk)return;
-  if(WATCH.some(w=>w.ticker===tk)){ analyzeStock(tk); return; }
+  const i=WATCH.findIndex(w=>w.ticker===tk);
+  if(i>=0){
+    if(tierOf(WATCH[i])===tier){ WATCH.splice(i,1); }   // 再点同一组 = 取消关注
+    else { WATCH[i].tier=tier; }                         // 在另一组 = 切换分组
+    save('watch',WATCH); renderWatchlist();
+    if(lastAnalyzed===tk) analyzeStock(tk);              // 刷新详情里的按钮高亮
+    return;
+  }
   try{
     const d=await yahoo(tk,'1y','1d');
     if(!d.closes||d.closes.length<20) throw 0;
     const m=computeStock(d.meta,d.closes,null,d.v);
-    WATCH.push({ticker:tk, note:'', addedDate:new Date().toLocaleDateString('zh-CN'), addedPrice:m.price, addedScore:m.Final});
+    WATCH.push({ticker:tk, note:'', tier, addedDate:new Date().toLocaleDateString('zh-CN'), addedPrice:m.price, addedScore:m.Final});
     save('watch',WATCH); renderWatchlist();
     if(lastAnalyzed===tk) renderStockDetail(tk,m,null);
   }catch(e){ alert('无法添加 '+tk+'（代码错误或抓取失败）'); }
 }
-function toggleWatch(tk){
-  const i=WATCH.findIndex(w=>w.ticker===tk);
-  if(i>=0){ WATCH.splice(i,1); save('watch',WATCH); renderWatchlist(); analyzeStock(tk); }
-  else addWatch(tk);
-}
+async function addWatch(tk, tier){ return setTier(tk, tier || curTier() || 'watch'); }
+function toggleWatch(tk){ return setTier(tk, curTier() || 'watch'); }
 function pendingTickersHtml(){
   return PENDING_TICKERS.length? `<div class="note" style="margin-bottom:8px;font-size:11px;line-height:1.5"><b>⚠️ 待确认/不可买(Robinhood)</b> — 你列的这几个无美股实时数据：<br>${PENDING_TICKERS.map(([t,d])=>`<b>${t}</b>: ${d}`).join('<br>')}</div>`:'';
 }
-let watchSort='order', _watchOk=[];
+let watchSort='order', _watchOk=[], _watchTier='watch';
 async function renderWatchlist(){
+  const tier=_watchTier=(curTier()||'watch');
   const pendingHtml = pendingTickersHtml();
-  if(!WATCH.length){ $('#stkList').innerHTML=pendingHtml+'<div class="muted small" style="padding:10px">⭐ 特别关注 是空的。<br>左边搜任意代码 → 点 <b>★ 加入特别关注</b>，或上面输入框直接加 —— 加进来的才会长期追踪评分/价格/潜力/买点。</div>'; $('#watchUpdated').textContent=''; return; }
-  $('#stkList').innerHTML=pendingHtml+`<div class="muted small" style="padding:10px">加载 ${WATCH.length} 只关注…</div>`;
-  $('#watchUpdated').textContent=WATCH.length+'只';
-  _watchOk = await Promise.all(WATCH.map(async(w,idx)=>{
+  const sel=WATCH.map((w,gidx)=>({w,gidx})).filter(x=>tierOf(x.w)===tier);
+  if(!sel.length){
+    const empty=tier==='focus'
+      ? '🎯 <b>重点关注</b> 是空的。<br>把最看重的几只放这里：左边搜代码 → 点 <b>🎯 重点</b>，或在「👀 观察中」卡片点 <b>⤴ 升为重点</b>。'
+      : '👀 <b>观察中</b> 是空的。<br>左边搜任意代码 → 点 <b>👀 观察</b>，或上面输入框直接加 —— 加进来的才会长期追踪评分/价格/潜力/买点。';
+    $('#stkList').innerHTML=pendingHtml+`<div class="muted small" style="padding:10px">${empty}</div>`; $('#watchUpdated').textContent=''; return;
+  }
+  $('#stkList').innerHTML=pendingHtml+`<div class="muted small" style="padding:10px">加载 ${sel.length} 只…</div>`;
+  $('#watchUpdated').textContent=sel.length+'只';
+  _watchOk = await Promise.all(sel.map(async({w,gidx})=>{
     try{
       const d=await yahoo(w.ticker,'1y','1d');
       const m=computeStock(d.meta,d.closes,null,d.v);
@@ -2526,22 +2545,25 @@ async function renderWatchlist(){
       if(w.addedPrice==null){ w.addedPrice=m.price; w.addedScore=m.Final; w.addedDate=new Date().toLocaleDateString('zh-CN'); save('watch',WATCH); }
       const chg=w.addedPrice?((m.price-w.addedPrice)/w.addedPrice*100):null;
       const sc=w.addedScore!=null?(m.Final-w.addedScore):null;
-      return {w, idx, m, chg, sc, ok:true};
-    }catch(e){ return {w, idx, ok:false}; }
+      return {w, gidx, m, chg, sc, ok:true};
+    }catch(e){ return {w, gidx, ok:false}; }
   }));
   renderWatchRows();
-  $('#watchUpdated').textContent=WATCH.length+'只 · '+new Date().toLocaleTimeString('zh-CN');
+  $('#watchUpdated').textContent=sel.length+'只 · '+new Date().toLocaleTimeString('zh-CN');
 }
 function renderWatchRows(){
+  const tier=_watchTier;
+  const other=tier==='focus'?'watch':'focus';
+  const moveLabel=tier==='focus'?'⤵ 移到观察':'⤴ 升为重点';
   const sortBar=`<div class="row" style="gap:5px;margin-bottom:8px;flex-wrap:wrap;align-items:center"><span class="muted small">排序</span>${[['order','加入顺序'],['az','A-Z'],['score','评分'],['chg','关注以来涨幅']].map(([k,l])=>`<button class="btn small ${watchSort===k?'on':''}" data-watchsort="${k}" style="padding:3px 9px">${l}</button>`).join('')}</div>`;
   const rows=_watchOk.slice();
   if(watchSort==='az') rows.sort((a,b)=>a.w.ticker.localeCompare(b.w.ticker));
   else if(watchSort==='score') rows.sort((a,b)=>(b.ok?b.m.Final:-1)-(a.ok?a.m.Final:-1));
   else if(watchSort==='chg') rows.sort((a,b)=>((b.ok&&b.chg!=null)?b.chg:-1e9)-((a.ok&&a.chg!=null)?a.chg:-1e9));
-  else rows.sort((a,b)=>a.idx-b.idx);
+  else rows.sort((a,b)=>a.gidx-b.gidx);
   const html=rows.map(r=>{
     const w=r.w;
-    if(!r.ok) return `<div class="panel sig" style="margin-bottom:8px"><div class="top"><span class="name">${w.ticker}</span><button class="btn small" data-wdel="${r.idx}" style="padding:3px 8px">删除</button></div><div class="small muted">取数失败</div></div>`;
+    if(!r.ok) return `<div class="panel sig" style="margin-bottom:8px"><div class="top"><span class="name">${w.ticker}</span><button class="btn small" data-wdel="${r.gidx}" style="padding:3px 8px">删除</button></div><div class="small muted">取数失败</div></div>`;
     const m=r.m, chg=r.chg, sc=r.sc;
     const color=m.Final>=60?'#3fb950':(m.Final>=45?'#d29922':'#6e7681');
     return `<div class="panel sig" style="margin-bottom:8px">
@@ -2553,10 +2575,15 @@ function renderWatchRows(){
         <div class="gauge" style="height:5px;margin-top:4px"><i style="width:${m.Final}%;background:${color}"></i></div>
         <div class="row" style="gap:6px;margin-top:5px">
           <button class="btn small" data-wanalyze="${w.ticker}" style="padding:3px 9px">详细分析</button>
+          <button class="btn small" data-wmove="${w.ticker}" data-totier="${other}" style="padding:3px 9px">${moveLabel}</button>
           <button class="btn small" data-walert="${w.ticker}" style="padding:3px 9px">🔔${(ALERTS[w.ticker]&&ALERTS[w.ticker].length)?'·'+ALERTS[w.ticker].length:''}</button>
-          <button class="btn small" data-wdel="${r.idx}" style="padding:3px 9px">删除</button></div></div>`;
+          <button class="btn small" data-wdel="${r.gidx}" style="padding:3px 9px">删除</button></div></div>`;
   }).join('');
   $('#stkList').innerHTML=pendingTickersHtml()+sortBar+html;
+}
+function moveWatchTier(tk, tier){
+  const w=WATCH.find(w=>w.ticker===tk); if(!w)return;
+  w.tier=tier; save('watch',WATCH); renderWatchlist();
 }
 function renderStkQuick(){
   $('#stkQuick').innerHTML=STK_QUICK.map(s=>`<button class="btn small" data-stk="${s}" style="padding:4px 8px">${s}</button>`).join('');
@@ -2780,7 +2807,7 @@ function renderMykCtrls(){
 async function renderMyKlines(){
   const grid=$('#mykGrid'); if(!grid)return;
   const tks=mykTks();
-  if(!tks.length){ renderMykCtrls(); renderMykList(); grid.innerHTML='<div class="muted small" style="padding:10px">还没有持仓或特别关注。先在「我的持仓」录入，或在「个股分析」搜索后「★加入特别关注」。</div>'; return; }
+  if(!tks.length){ renderMykCtrls(); renderMykList(); grid.innerHTML='<div class="muted small" style="padding:10px">还没有持仓或关注。先在「我的持仓」录入，或在「个股分析」搜索后加入「👀观察」或「🎯重点」。</div>'; return; }
   if(!mykSel||!tks.includes(mykSel)) mykSel=tks[0];
   if(mykStart>=tks.length) mykStart=0;
   const pageTks = mykView===1 ? [mykSel] : tks.slice(mykStart, mykStart+mykView);
@@ -2933,7 +2960,9 @@ $('#stkBtn').onclick=()=>analyzeStock($('#stkInput').value, parseFloat($('#stkTa
 $('#stkInput').addEventListener('keydown',e=>{if(e.key==='Enter')analyzeStock($('#stkInput').value, parseFloat($('#stkTarget').value)||null);});
 $('#stkQuick').addEventListener('click',e=>{const s=e.target.dataset.stk; if(s){$('#stkInput').value=s; analyzeStock(s, parseFloat($('#stkTarget').value)||null);}});
 $('#stkWatch').onclick=()=>addWatch(lastAnalyzed || $('#stkInput').value);
-$('#stkResult').addEventListener('click',e=>{const tk=e.target.dataset.watchtoggle; if(tk)toggleWatch(tk);
+$('#stkResult').addEventListener('click',e=>{
+  const wts=e.target.closest('[data-wtierset]'); if(wts){ setTier(wts.dataset.tk, wts.dataset.wtierset); return; }
+  const tk=e.target.dataset.watchtoggle; if(tk)toggleWatch(tk);
   const af=e.target.dataset.alertfor; if(af)openAlertFor(af);
   const s2=e.target.dataset.stk2; if(s2){ $('#stkInput').value=s2; analyzeStock(s2); }
   const gc=e.target.dataset.gochain; if(gc){ e.preventDefault(); if(typeof openChainFor==='function')openChainFor(gc); }});
@@ -2944,6 +2973,7 @@ $('#watchAdd').addEventListener('keydown',e=>{if(e.key==='Enter'){const v=e.targ
 $('#stkList').addEventListener('click',e=>{
   const ts=e.target.closest('[data-themesort]'); if(ts){ themeSort=ts.dataset.themesort; renderThemeList(); return; }
   const ws=e.target.closest('[data-watchsort]'); if(ws){ watchSort=ws.dataset.watchsort; renderWatchRows(); return; }
+  const wm=e.target.closest('[data-wmove]'); if(wm){ moveWatchTier(wm.dataset.wmove, wm.dataset.totier); return; }
   const a=e.target.dataset.wanalyze, dl=e.target.dataset.wdel, tw=e.target.dataset.themewatch, wa=e.target.dataset.walert;
   if(a){$('#stkInput').value=a; analyzeStock(a);}
   if(tw)addWatch(tw);
