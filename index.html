@@ -1989,6 +1989,21 @@ async function loadAnalystTarget(tk, price){
       if(pt && pt.targetMean){ setRefTgt(pt.targetMean, price, '分析师均值·Finnhub', pt.targetHigh, pt.targetLow); return; }
     }catch(e){}
   }
+  // 无 key 兜底：Yahoo insights（免费·无需 key）——单家研究机构目标价+评级。注意：是"单家"(如 Argus)，非多家投行共识均值；多家均值需 FMP/Finnhub key。
+  try{
+    const r=await fetchVia('https://query1.finance.yahoo.com/ws/insights/v2/finance/insights?symbol='+encodeURIComponent(tk));
+    const res=r&&r.finance&&r.finance.result, rec=res&&res.recommendation;
+    if(rec && rec.targetPrice){
+      const prov=rec.provider||'研究机构', rating=rec.rating?(''+rec.rating).toUpperCase():'';
+      setRefTgt(rec.targetPrice, price, prov+(rating?'·'+rating:'')+'·单家非均值');
+      // 顺带把 Trading Central 的"高/低估"读数补到估值行(若有)
+      const v=res.instrumentInfo&&res.instrumentInfo.valuation;
+      const vl=document.getElementById('tcValLine');
+      if(vl && v && v.description){ const cn={'Overvalued':'偏高估','Undervalued':'偏低估','Fairly Valued':'估值合理'}[v.description]||v.description;
+        vl.innerHTML=`第三方估值读数 <b>${cn}</b> <span class="muted">(${v.relativeValue||''}${v.discount?' · 折溢价'+v.discount:''} · Trading Central)</span>`; }
+      return;
+    }
+  }catch(e){}
 }
 /* ===== 🎓 投资大师视角：规则化套用各大师公开的"选股标准"(非LLM·非涨跌预测)；多数需基本面(Finnhub) ===== */
 function _chk(label,ok,detail){ return {label,ok,detail}; }
@@ -2243,7 +2258,8 @@ function renderStockDetail(tk,m,target){
         <div style="flex:1;min-width:210px;background:var(--panel2);border:1px solid ${pot.color};border-radius:10px;padding:10px 12px">
           <div class="small muted">📈 潜力（还有多少上涨空间）</div>
           <div style="font-size:23px;font-weight:800;color:${pot.color};line-height:1.2">${pot.lvl}</div>
-          <div class="small" id="refTgtLine">参考目标价 <b>$${fmt(tgt,2)}</b> · 上行 <b style="color:${pot.color}">${pot.up!=null?(pot.up>=0?'+':'')+fmt(pot.up,1)+'%':'–'}</b> <span class="muted">(${pot.toTgt?'你设的目标价':'52周高·非投行目标·填FMP/Finnhub key显示投行共识'})</span></div>
+          <div class="small" id="refTgtLine">参考目标价 <b>$${fmt(tgt,2)}</b> · 上行 <b style="color:${pot.color}">${pot.up!=null?(pot.up>=0?'+':'')+fmt(pot.up,1)+'%':'–'}</b> <span class="muted">(${pot.toTgt?'你设的目标价':'52周高·技术参考(无分析师覆盖时)'})</span></div>
+          <div class="small" id="tcValLine" style="margin-top:2px"></div>
         </div>
         <div style="flex:1;min-width:210px;background:var(--panel2);border:1px solid ${bpt.color};border-radius:10px;padding:10px 12px">
           <div class="small muted">🎯 当前买点（现在买合不合适）</div>
