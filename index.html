@@ -2435,24 +2435,33 @@ async function showTheme(key){
   list.innerHTML=`<div class="muted small" style="padding:8px">抓取 ${th.tickers.length} 只股票并排名中…</div>`;
   const rows=await Promise.all(th.tickers.map(async tk=>{
     try{ const d=await yahoo(tk,'1y','1d'); if(!d.closes||d.closes.length<30)return null;
-      return {tk, m:computeStock(d.meta,d.closes,null,d.v)}; }catch(e){ return null; }
+      const prev=d.closes.length>=2?d.closes[d.closes.length-2]:null, m=computeStock(d.meta,d.closes,null,d.v);
+      return {tk, m, dayPct:prev?(m.price-prev)/prev*100:null}; }catch(e){ return null; }
   }));
   if(curTheme!==key) return;                       // 期间已切走则放弃
-  const ok=rows.filter(Boolean).sort((a,b)=>b.m.Final-a.m.Final);
-  if(!ok.length){ list.innerHTML='<div class="note" style="margin:8px">抓取失败，点主题重试。</div>'; return; }
-  // 板块整体强弱小结
-  const avg=Math.round(ok.reduce((a,r)=>a+r.m.Final,0)/ok.length);
-  const bull=ok.filter(r=>r.m.Final>=55).length, weak=ok.filter(r=>r.m.Final<45).length;
+  _themeOk=rows.filter(Boolean);
+  if(!_themeOk.length){ list.innerHTML='<div class="note" style="margin:8px">抓取失败，点主题重试。</div>'; return; }
+  renderThemeList();
+}
+let themeSort='score', _themeOk=[];
+function renderThemeList(){
+  const list=$('#stkList'); if(!list||!_themeOk.length)return; const ok=_themeOk.slice();
+  if(themeSort==='chg') ok.sort((a,b)=>(b.dayPct==null?-1e9:b.dayPct)-(a.dayPct==null?-1e9:a.dayPct));
+  else if(themeSort==='az') ok.sort((a,b)=>a.tk.localeCompare(b.tk));
+  else ok.sort((a,b)=>b.m.Final-a.m.Final);
+  const byScore=_themeOk.slice().sort((a,b)=>b.m.Final-a.m.Final);
+  const avg=Math.round(_themeOk.reduce((a,r)=>a+r.m.Final,0)/_themeOk.length);
+  const bull=_themeOk.filter(r=>r.m.Final>=55).length, weak=_themeOk.filter(r=>r.m.Final<45).length;
   const tone=avg>=58?'偏强':(avg>=45?'中性':'偏弱'), toneColor=avg>=58?'#3fb950':(avg>=45?'#d29922':'#6e7681');
-  const lead=ok[0], lag=ok[ok.length-1];
+  const lead=byScore[0], lag=byScore[byScore.length-1];
+  const sortBtns=[['score','评分'],['chg','涨幅'],['az','A-Z']].map(([k,n])=>`<button class="ctrlbtn${themeSort===k?' on':''}" data-themesort="${k}">${n}</button>`).join('');
   const summary=`<div class="panel sig" style="margin-bottom:8px;border-color:${toneColor}">
-    <div class="top"><span class="name">📊 板块整体 <b style="color:${toneColor}">${tone}</b></span><span>均分 <b style="color:${toneColor}">${avg}</b></span></div>
-    <div class="small muted">${ok.length}只 · 偏多 ${bull} / 偏弱 ${weak} · 龙头 ${lead.tk}(${lead.m.Final}) · 末位 ${lag.tk}(${lag.m.Final})</div>
-    <div class="gauge" style="height:5px;margin-top:4px"><i style="width:${avg}%;background:${toneColor}"></i></div></div>`;
+    <div class="top"><span class="name">📊 板块整体 <b style="color:${toneColor}">${tone}</b> <span class="muted small">均分 ${avg}</span></span><span class="small">排序 ${sortBtns}</span></div>
+    <div class="small muted">${_themeOk.length}只 · 偏多 ${bull} / 偏弱 ${weak} · 龙头 ${lead.tk}(${lead.m.Final}) · 末位 ${lag.tk}(${lag.m.Final})</div></div>`;
   list.innerHTML=summary+ok.map((r,i)=>{
     const m=r.m, rec=holdRec(m), color=m.Final>=60?'#3fb950':(m.Final>=45?'#d29922':'#6e7681');
     return `<div class="panel sig" style="margin-bottom:8px">
-      <div class="top"><span class="name">#${i+1} ${r.tk} <span class="muted small" style="font-weight:400">$${fmt(m.price,2)}</span></span>
+      <div class="top"><span class="name">#${i+1} ${r.tk} <span class="muted small" style="font-weight:400">$${fmt(m.price,2)}</span> <span class="${cls(r.dayPct)} small">${pct(r.dayPct)}</span></span>
         <span>综合 <b style="color:${color}">${m.Final}</b></span></div>
       <div class="small" style="color:${rec.color}">${rec.tag}</div>
       <div class="small">${potBuyLine(m)}</div>
@@ -2773,7 +2782,9 @@ function redrawVisibleCharts(){
 /* =================================================================
    📡 博主追踪(多人)：读同源 bloggers.json(云端每30分采集+总结)，渲染每个博主可展开的观点卡。Serenity 只是第一个。
    ================================================================= */
-let _blogSel=null, _blogData=null;
+let _blogSel=null, _blogData=null, _blogSort='new';
+/* 把帖子的 time 解析成可比较时间戳(支持 YYYY-MM-DD / YYYY-MM)，"近期/背景"等无日期→null(排最后) */
+function _postTs(p){ const m=((p&&p.time)||'').match(/(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/); return m? Date.parse(m[1]+'-'+m[2].padStart(2,'0')+'-'+(m[3]||'01').padStart(2,'0')) : null; }
 async function loadBloggers(){
   const feed=$('#blogFeed'); if(!feed)return;
   try{ const r=await fetch('bloggers.json?cb='+Date.now(),{cache:'no-store'}); _blogData = r.ok? await r.json() : null; }catch(e){ _blogData=null; }
@@ -2821,7 +2832,9 @@ function renderBloggerFeed(b){
   const ov=(b.overview?`<b>💡 本轮要点</b> ${b.overview}`:'')+((b.tickers&&b.tickers.length)?`<div style="margin-top:6px"><span class="muted">提到的票：</span>${b.tickers.map(t=>`<a href="#" data-stk="${t}" class="pill buy" style="margin:0 4px 4px 0;display:inline-block">${t}</a>`).join('')}</div>`:'');
   const head=`<div class="panel" style="margin-bottom:8px"><div style="font-weight:700">${b.name||b.id} <span class="muted small" style="font-weight:400">${b.handle||''}${b.reddit?' · '+b.reddit:''}</span></div>${b.bio?`<div class="small muted" style="margin-top:2px">${b.bio}</div>`:''}${ov?`<div class="small" style="margin-top:6px;line-height:1.6">${ov}</div>`:''}
     <div class="small muted" style="margin-top:6px;line-height:1.5">每条给<b>两个判断分开看</b>：<b style="color:#d2a8ff">🗣 推荐人建议</b>(博主自己怎么说) ＋ <b style="color:#58a6ff">🔎 系统买点</b>(本台实时数据的客观买点) —— <b>她看好 ≠ 系统说现在好买</b>，自己权衡。类型：🟢看涨/买入 · 🔵复盘/赞许(非新入场) · ⚪分析/科普。</div></div>`;
-  const posts=(b.posts||[]).map(p=>{
+  const sorted=(b.posts||[]).slice().sort((x,y)=>{const tx=_postTs(x),ty=_postTs(y); if(tx==null&&ty==null)return 0; if(tx==null)return 1; if(ty==null)return -1; return _blogSort==='old'?tx-ty:ty-tx;});
+  const sortBar=`<div class="row small" style="margin-bottom:8px;gap:4px;align-items:center"><span class="muted">按发表时间</span><button class="ctrlbtn${_blogSort==='new'?' on':''}" data-blogsort="new">最新在前</button><button class="ctrlbtn${_blogSort==='old'?' on':''}" data-blogsort="old">最早在前</button></div>`;
+  const posts=sorted.map(p=>{
     const bull=(p.bullish||[]).map(t=>`<a href="#" data-stk="${t}" class="pill buy">${t}</a>`).join(' ');
     const chain=(p.chain||[]).map(c=>`<span class="pill">${c}</span>`).join(' ');
     const verdicts=(p.bullish||[]).map(t=>`<div class="small" style="margin-top:2px;padding-left:6px"><span class="blog-verdict" data-vtk="${t}"><b>${t}</b> 核对中…</span></div>`).join('');
@@ -2835,12 +2848,13 @@ function renderBloggerFeed(b){
       ${chain?`<div class="small" style="margin-top:6px"><b style="color:#58a6ff">🔗 产业链</b> ${chain}</div>`:''}
       ${more}
     </div>`;
-  }).join('') || '<div class="muted small" style="padding:8px">该博主暂无采集到的观点。</div>';
-  feed.innerHTML=head+posts;
+  }).join('');
+  feed.innerHTML = head + sortBar + (posts || '<div class="muted small" style="padding:8px">该博主暂无采集到的观点。</div>');
   _fillBlogVerdicts();
 }
 document.addEventListener('click',e=>{
   if(!e.target.closest('#bloggers'))return;
+  const bs=e.target.closest('[data-blogsort]'); if(bs){ _blogSort=bs.dataset.blogsort; renderBloggers(); return; }
   const nb=e.target.closest('#blogNav [data-blog]'); if(nb){ _blogSel=nb.dataset.blog; renderBloggers(); return; }
   const stk=e.target.closest('#bloggers [data-stk]'); if(stk){ e.preventDefault(); $('#stkInput').value=stk.dataset.stk; openTab('stock'); analyzeStock(stk.dataset.stk); return; }
   const ex=e.target.closest('.blog-exp'); if(ex){ e.preventDefault(); const m=ex.previousElementSibling;
@@ -2889,6 +2903,7 @@ $('#themeTabs').addEventListener('click',e=>{const b=e.target.closest('[data-the
 $('#watchAddBtn').onclick=()=>{const v=$('#watchAdd').value;$('#watchAdd').value='';addWatch(v);};
 $('#watchAdd').addEventListener('keydown',e=>{if(e.key==='Enter'){const v=e.target.value;e.target.value='';addWatch(v);}});
 $('#stkList').addEventListener('click',e=>{
+  const ts=e.target.closest('[data-themesort]'); if(ts){ themeSort=ts.dataset.themesort; renderThemeList(); return; }
   const a=e.target.dataset.wanalyze, dl=e.target.dataset.wdel, tw=e.target.dataset.themewatch, wa=e.target.dataset.walert;
   if(a){$('#stkInput').value=a; analyzeStock(a);}
   if(tw)addWatch(tw);

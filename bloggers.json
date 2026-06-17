@@ -1,5 +1,5 @@
 {
-  "updated": "2026-06-17T13:35:00-08:00",
+  "updated": "2026-06-17T14:05:00-08:00",
   "bloggers": [
     {
       "id": "serenity",
@@ -11,20 +11,7 @@
       "tickers": ["AAOI", "NBIS", "RKLB", "ALAB", "COHR", "MRVL", "LITE", "AXTI"],
       "posts": [
         {
-          "time": "2026",
-          "source": "X",
-          "type": "看涨/目标价",
-          "rec": "明确目标价(本人观点)：NBIS PT$400/1Y、RKLB PT$500/5Y、ALAB PT$250/6M、CRCL PT$150/8M",
-          "title": "组合调仓+目标价：NBIS $92→$400、RKLB $43→$500、ALAB $143→$250、CRCL $72→$150",
-          "key": "按他的股票排名表重配组合，给每只设了目标价与时间框架（均为其本人观点、未核实）。",
-          "bullish": ["NBIS", "RKLB", "ALAB", "CRCL"],
-          "potential": "他设的目标价：NBIS +335%/1年、RKLB +1060%/5年、ALAB +74%/6月、CRCL +108%/8月（本人观点·非预测·高波动）",
-          "chain": ["算力/AI基建", "航天/卫星"],
-          "detail": "原帖：基于其股票排名表逐只分析并重配组合——$NBIS @$92 目标$400(1年)、$RKLB @$43 目标$500(5年)、$CRCL @$72 目标$150(8月)、$ALAB @$143.4 目标$250(6月) 等。目标价/时间均为其本人设定，未经独立核实，参考即可、自行控仓。",
-          "url": "https://x.com/aleabitoreddit/status/1991452423186182524"
-        },
-        {
-          "time": "2026-06",
+          "time": "2026-06-04",
           "source": "X",
           "type": "看涨/加仓",
           "rec": "看涨 · 建议关注/加仓（她从 $28 起持续向上加仓）",
@@ -33,8 +20,8 @@
           "bullish": ["AAOI"],
           "potential": "高 · 她本人称执行到位可能翻倍~三倍（其个人观点·非预测·小盘高波动）",
           "chain": ["光通信/光学"],
-          "detail": "原话大意：$AAOI 是他从 $28 起不断向上加仓的名字之一，认为 800G/1.6T 光模块需求太大、公司执行到位就可能翻倍甚至三倍。这正是你持仓里的 AAOI——她明确看多；但请看「系统买点」对当前买点的客观判断，别只因她看好就追高。",
-          "url": "https://x.com/aleabitoreddit"
+          "detail": "原话大意：$AAOI 是他从 $28 起不断向上加仓的名字之一，认为 800G/1.6T 光模块需求太大、公司执行到位就可能翻倍甚至三倍。这正是你持仓里的 AAOI——她明确看多；但请看「系统买点」对当前买点的客观判断，别只因她看好就追高。（日期由推文ID解码）",
+          "url": "https://x.com/aleabitoreddit/status/2062697638500462639"
         },
         {
           "time": "2026-06-11",
@@ -50,46 +37,7 @@
           "url": "https://x.com/aleabitoreddit"
         },
         {
-          "time": "2026",
-          "source": "X/报道",
-          "type": "看涨",
-          "rec": "看好 COHR（英伟达 $2B 光学投资分给 COHR/LITE）",
-          "title": "COHR：下一代 ASIC 的光子受益，英伟达 $2B 光学投资标的之一",
-          "key": "NVDA 把 $2B 光学投资分给 COHR 与 LITE；COHR 受益下一代 ASIC 的光子部署。",
-          "bullish": ["COHR", "LITE"],
-          "potential": "高 · 2026 YTD COHR +107%、LITE +138%（已大涨，注意追高）",
-          "chain": ["光通信/光学"],
-          "detail": "他指 NVDA 的 $2B 光学投资分给 COHR 和 LITE；COHR 受益下一代 ASIC 的光子放量，LITE 在几乎每个超大厂 ASIC 部署里都有、且 Google TPU 的 BOM 很大。注意这两只 2026 已大涨(COHR +107%/LITE +138%)，看「系统买点」别追高。",
-          "url": "https://x.com/aleabitoreddit"
-        },
-        {
-          "time": "2026",
-          "source": "X/报道",
-          "type": "看涨/长期",
-          "rec": "MRVL 长期看多（称 'really good long term long'）",
-          "title": "MRVL：英伟达 $2B 验证 Marvell + Celestial AI 的 CPO 光纤路线",
-          "key": "他认为 NVDA 的 $2B 投资验证了 Marvell 与 Celestial AI 的光纤 CPO 路线图，当长期底仓看。",
-          "bullish": ["MRVL"],
-          "potential": "长期 · 2026 YTD MRVL +228%（已大涨）",
-          "chain": ["光通信/光学", "算力/AI基建"],
-          "detail": "他把 MRVL 形容为 'really good long term long'(很好的长期多头)，认为英伟达 $2B 投资验证了 Marvell + Celestial AI 的光纤 CPO 路线。注意 MRVL 2026 已涨 +228%，看「系统买点」判断当前是否还适合入。",
-          "url": "https://x.com/aleabitoreddit"
-        },
-        {
-          "time": "2026",
-          "source": "X",
-          "type": "分析/分类",
-          "rec": "算力/数据中心分桶：NBIS/WULF/CIFR=Mag7合同, IREN/BITF=算力, TSSI≈SMCI",
-          "title": "算力/数据中心怎么分桶：neocloud vs 矿转算力",
-          "key": "把算力票分类：NBIS/WULF/CIFR 接 Mag7 大厂合同；IREN/BITF 偏算力租赁；TSSI 类似 SMCI(服务器/集成)。",
-          "bullish": ["NBIS", "IREN", "CIFR", "TSSI"],
-          "potential": "分类/方法 · 高波动算力主题",
-          "chain": ["算力/AI基建"],
-          "detail": "他对算力/数据中心票分桶：$NBIS/$WULF/$CIFR 是 Mag7(大厂)合同的载体；$IREN/$BITF 偏算力；$TSSI 类似 $SMCI(服务器/集成)；BITF 等矿企转算力。属高波动主题，控仓为上。",
-          "url": "https://x.com/aleabitoreddit"
-        },
-        {
-          "time": "2026-01-01",
+          "time": "2026-01-02",
           "source": "X",
           "type": "看涨/评级名单",
           "rec": "开年评级名单：Strong Buy 一组 + Buy 一组（见下，含海外票）",
@@ -98,11 +46,63 @@
           "bullish": ["AXTI", "TSM", "META", "SMCI", "INTC", "HIMS", "NBIS", "IREN", "NVDA", "MU", "AMKR", "AAOI", "COHR", "LITE"],
           "potential": "评级类 · 方向性参考",
           "chain": ["算力/AI基建", "光通信/光学", "存储"],
-          "detail": "1/1 评级原文 —— Strong Buy: TTD SMCI AIRO INTC HIMS AXTI TSM NBIS CIFR Samsung HUT IREN WULF GLXY TSSI META ETOR CRCL；Buy: KRKNF ONDS GEMI NVDA MU AMKR SK海力士 SNAP RDDT AAOI COHR FISV FLY DJT LITE。(Samsung/SK海力士/KRKNF 等海外票不可在 Robinhood 买；评级为其本人观点、非投资建议。)",
+          "detail": "1/1 评级原文 —— Strong Buy: TTD SMCI AIRO INTC HIMS AXTI TSM NBIS CIFR Samsung HUT IREN WULF GLXY TSSI META ETOR CRCL；Buy: KRKNF ONDS GEMI NVDA MU AMKR SK海力士 SNAP RDDT AAOI COHR FISV FLY DJT LITE。(Samsung/SK海力士/KRKNF 等海外票不可在 Robinhood 买；评级为其本人观点、非投资建议。日期由推文ID解码=1/2发布)",
           "url": "https://x.com/aleabitoreddit/status/2007071108831338685"
         },
         {
-          "time": "2026-06-16",
+          "time": "2025-11-20",
+          "source": "X",
+          "type": "看涨/目标价",
+          "rec": "明确目标价(本人观点)：NBIS PT$400/1Y、RKLB PT$500/5Y、ALAB PT$250/6M、CRCL PT$150/8M",
+          "title": "组合调仓+目标价：NBIS $92→$400、RKLB $43→$500、ALAB $143→$250、CRCL $72→$150",
+          "key": "按他的股票排名表重配组合，给每只设了目标价与时间框架（均为其本人观点、未核实）。",
+          "bullish": ["NBIS", "RKLB", "ALAB", "CRCL"],
+          "potential": "他设的目标价：NBIS +335%/1年、RKLB +1060%/5年、ALAB +74%/6月、CRCL +108%/8月（本人观点·非预测·高波动）",
+          "chain": ["算力/AI基建", "航天/卫星"],
+          "detail": "2025-11-20 原帖(日期由推文ID解码)：基于其股票排名表逐只分析并重配组合——$NBIS @$92 目标$400(1年)、$RKLB @$43 目标$500(5年)、$CRCL @$72 目标$150(8月)、$ALAB @$143.4 目标$250(6月) 等。⚠️ 这是去年11月的帖，价位已变；目标价/时间为其本人设定、未核实，参考即可、看「系统买点」当前情况。",
+          "url": "https://x.com/aleabitoreddit/status/1991452423186182524"
+        },
+        {
+          "time": "2026 近期",
+          "source": "X/报道",
+          "type": "看涨",
+          "rec": "看好 COHR（英伟达 $2B 光学投资分给 COHR/LITE）",
+          "title": "COHR：下一代 ASIC 的光子受益，英伟达 $2B 光学投资标的之一",
+          "key": "NVDA 把 $2B 光学投资分给 COHR 与 LITE；COHR 受益下一代 ASIC 的光子部署。",
+          "bullish": ["COHR", "LITE"],
+          "potential": "高 · 2026 YTD COHR +107%、LITE +138%（已大涨，注意追高）",
+          "chain": ["光通信/光学"],
+          "detail": "他指 NVDA 的 $2B 光学投资分给 COHR 和 LITE；COHR 受益下一代 ASIC 的光子放量，LITE 在几乎每个超大厂 ASIC 部署里都有、且 Google TPU 的 BOM 很大。注意这两只 2026 已大涨(COHR +107%/LITE +138%)，看「系统买点」别追高。(综合多篇报道·无单条确切日期)",
+          "url": "https://x.com/aleabitoreddit"
+        },
+        {
+          "time": "2026 近期",
+          "source": "X/报道",
+          "type": "看涨/长期",
+          "rec": "MRVL 长期看多（称 'really good long term long'）",
+          "title": "MRVL：英伟达 $2B 验证 Marvell + Celestial AI 的 CPO 光纤路线",
+          "key": "他认为 NVDA 的 $2B 投资验证了 Marvell 与 Celestial AI 的光纤 CPO 路线图，当长期底仓看。",
+          "bullish": ["MRVL"],
+          "potential": "长期 · 2026 YTD MRVL +228%（已大涨）",
+          "chain": ["光通信/光学", "算力/AI基建"],
+          "detail": "他把 MRVL 形容为 'really good long term long'(很好的长期多头)，认为英伟达 $2B 投资验证了 Marvell + Celestial AI 的光纤 CPO 路线。注意 MRVL 2026 已涨 +228%，看「系统买点」判断当前是否还适合入。(综合报道·无单条确切日期)",
+          "url": "https://x.com/aleabitoreddit"
+        },
+        {
+          "time": "2026 近期",
+          "source": "X",
+          "type": "分析/分类",
+          "rec": "算力/数据中心分桶：NBIS/WULF/CIFR=Mag7合同, IREN/BITF=算力, TSSI≈SMCI",
+          "title": "算力/数据中心怎么分桶：neocloud vs 矿转算力",
+          "key": "把算力票分类：NBIS/WULF/CIFR 接 Mag7 大厂合同；IREN/BITF 偏算力租赁；TSSI 类似 SMCI(服务器/集成)。",
+          "bullish": ["NBIS", "IREN", "CIFR", "TSSI"],
+          "potential": "分类/方法 · 高波动算力主题",
+          "chain": ["算力/AI基建"],
+          "detail": "他对算力/数据中心票分桶：$NBIS/$WULF/$CIFR 是 Mag7(大厂)合同的载体；$IREN/$BITF 偏算力；$TSSI 类似 $SMCI(服务器/集成)；BITF 等矿企转算力。属高波动主题，控仓为上。(综合·无单条确切日期)",
+          "url": "https://x.com/aleabitoreddit"
+        },
+        {
+          "time": "2026 近期·复盘",
           "source": "X",
           "type": "复盘/招牌",
           "rec": "复盘成名旧仓 · 已大涨，非新入场建议",
