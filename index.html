@@ -166,10 +166,10 @@
 <header>
   <div class="brand"><span class="logo">📈</span>美股参考台<span class="clock" id="clock"></span></div>
   <nav class="tabs" id="tabs">
-    <button class="tab active" data-tab="dash">📊 市场监控</button>
+    <button class="tab" data-tab="dash">📊 市场监控</button>
     <button class="tab" data-tab="stock">🔎 个股分析</button>
     <button class="tab" data-tab="chain">🔗 产业链</button>
-    <button class="tab" data-tab="market">🌐 市场动向</button>
+    <button class="tab active" data-tab="market">🌐 市场动向</button>
     <button class="tab" data-tab="news">📰 全球新闻</button>
     <button class="tab" data-tab="bloggers">📡 博主追踪</button>
     <button class="tab" data-tab="port">💼 我的持仓</button>
@@ -192,7 +192,7 @@
 
 <main>
   <!-- ===================== DASHBOARD ===================== -->
-  <section id="dash" class="active">
+  <section id="dash">
     <div style="flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1.5fr 1fr;gap:10px">
 
       <!-- 左列：评分 + 分析 + 两张图（固定，不滚动） -->
@@ -271,7 +271,7 @@
   </section>
 
   <!-- ===================== MARKET ===================== -->
-  <section id="market">
+  <section id="market" class="active">
     <div class="panel" style="flex:0 0 auto"><h3>宏观行情 · 实时 <span class="tag" id="macroUpdated"></span></h3>
       <div class="grid" style="grid-template-columns:repeat(9,1fr);gap:8px" id="macroRow"><div class="muted small">加载中…</div></div></div>
     <div style="flex:1 1 auto;min-height:0;display:grid;grid-template-columns:0.85fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:10px">
@@ -283,8 +283,8 @@
         <div id="mNdxChart" class="chart"></div></div>
       <div class="panel cpanel"><h3>美债10年收益率 <span class="chart-ctrl" id="tnxCtrl"></span></h3>
         <div id="tnxChart" class="chart"></div></div>
-      <div class="panel cpanel"><h3>经济日历 <a class="tag" href="https://www.tradingview.com/economic-calendar/" target="_blank" rel="noopener">日历 ↗</a></h3>
-        <div id="tvCal" class="chart"></div></div>
+      <div class="panel cpanel"><h3>道琼斯工业 <span class="chart-ctrl" id="djiCtrl"></span></h3>
+        <div id="djiChart" class="chart"></div></div>
     </div>
   </section>
 
@@ -1862,7 +1862,6 @@ async function loadMacroRow(){
 }
 let marketFetched=false;
 async function loadMarket(){
-  loadCalendar();
   loadMacroRow();
   loadSectorRotation();
   if(!marketFetched){   // 首次：挂载交互式图表；之后刷新只更新数据
@@ -1870,7 +1869,8 @@ async function loadMarket(){
     mountChart('mSpxChart','mSpxCtrl','^GSPC',{range:'1y',interval:'1d',type:'candle',ma:200,dec:0});
     mountChart('mNdxChart','mNdxCtrl','^NDX',{range:'1y',interval:'1d',type:'candle',ma:200,dec:0});
     mountChart('tnxChart','tnxCtrl','^TNX',{range:'1y',interval:'1d',type:'candle',ma:null,dec:2});
-  }else{ refreshChart('mSpxChart'); refreshChart('mNdxChart'); refreshChart('tnxChart'); }
+    mountChart('djiChart','djiCtrl','^DJI',{range:'1y',interval:'1d',type:'candle',ma:200,dec:0});
+  }else{ refreshChart('mSpxChart'); refreshChart('mNdxChart'); refreshChart('tnxChart'); refreshChart('djiChart'); }
 }
 /* 板块轮动：11个SPDR行业ETF多周期涨跌幅，按1月排名（真实Yahoo数据） */
 const SECTORS=[['XLK','科技'],['XLC','通信'],['XLY','可选消费'],['XLP','必需消费'],['XLE','能源'],['XLF','金融'],['XLV','医疗'],['XLI','工业'],['XLB','材料'],['XLRE','地产'],['XLU','公用']];
@@ -1932,7 +1932,8 @@ function computeStock(meta, closes, target, volumes){
   const b=BLEND[CFG.style]??0.5;
   const Timing=(Value!=null&&Trend!=null)?Value*b+Trend*(1-b):(Value??Trend);
   const Under=wAvg([[V.pos,1],[vsMean!=null?lin(-vsMean,-0.10,0.25):null,1],[V.ma,1]]);
-  const Risk=wAvg([[lin(vol,0.18,0.65),1],[lin(-mdd,0.15,0.6),1]]);
+  // 风险=年化波动+最大回撤的相对刻度。区间放宽到 15%~110% / 10%~85%，让高波动股也有梯度(不会一律顶到100=安全0)
+  const Risk=wAvg([[lin(vol,0.15,1.10),1],[lin(-mdd,0.10,0.85),1]]);
   // 综合分=买点×0.69 + 低估×0.31（已去掉"波动惩罚"——回测显示它把 Final 拉成负相关；去掉后12月相关性 +0.165）。Risk 仍单独展示供参考。
   const Final=Math.round(0.6875*Timing + 0.3125*(Under??Value??50));
   const lo20=closes.length>=20?lowestN(closes,20):null;
@@ -2052,12 +2053,8 @@ const INVESTOR_LENSES=[
 ];
 async function loadInvestorLenses(tk, m){
   const box=document.getElementById('lensBox'); if(!box)return;
-  if(!CFG.finnhubKey){   // 没 key → 不堆一排"需基本面key"的空卡，只给一句干净说明
-    box.innerHTML='<div class="small muted" style="margin-top:8px;padding:9px 11px;border:1px dashed var(--border);border-radius:8px;line-height:1.6">🎓 <b>投资大师视角</b>（巴菲特/格雷厄姆/林奇/芒格… 按各自公开选股标准逐条核对）需要<b>基本面数据</b>。填一个 <b>免费</b> Finnhub key（⚙设置 → 2分钟、不花钱）即可解锁，连同下方 P/E、营收、毛利、ROE、机构评级 一起显示。未填则本台只用技术面/相对估值，照常可用。</div>';
-    return;
-  }
   let met=null;
-  try{ const r=await finnhub('/stock/metric?symbol='+tk+'&metric=all'); met=r&&r.metric?r.metric:null; }catch(e){}
+  if(CFG.finnhubKey){ try{ const r=await finnhub('/stock/metric?symbol='+tk+'&metric=all'); met=r&&r.metric?r.metric:null; }catch(e){} }
   const g=k=>(met&&met[k]!=null)?met[k]:null;
   const cards=INVESTOR_LENSES.map(L=>{
     const checks=L.fn(m,g), ev=checks.filter(c=>c.ok!=null), pass=checks.filter(c=>c.ok===true).length;
@@ -2072,7 +2069,7 @@ async function loadInvestorLenses(tk, m){
       <div style="margin-top:5px">${ch}</div></div>`;
   }).join('');
   box.innerHTML=`<h3 style="margin:10px 2px 4px;font-size:12px;color:var(--muted)">🎓 投资大师视角（规则化套用其公开选股标准 · 非AI生成 · 非涨跌预测）</h3>
-    ${CFG.finnhubKey?'':'<div class="small muted" style="margin-bottom:6px">⚠️ 多数框架需基本面——填 <b>Finnhub key</b>(⚙设置)解锁 巴菲特/格雷厄姆/林奇/芒格 等；马克斯(周期)仅用价格、现在就能看。</div>'}
+    ${CFG.finnhubKey?'':'<div class="small muted" style="margin-bottom:6px">⚠️ 巴菲特/格雷厄姆/林奇/芒格/格林布拉特 等需<b>基本面</b>(标"数据不足")——填一个<b>免费</b> Finnhub key(⚙设置·2分钟·不花钱)即全部解锁逐条✓/✗；<b>马克斯(周期)、克拉曼(回撤/均值)</b> 只用价格，现在就能看。</div>'}
     <div class="grid" style="grid-template-columns:1fr 1fr;gap:8px">${cards}</div>
     <div class="small muted" style="margin-top:4px">把各大师公开的<b>量化选股标准</b>逐条核对(✓符合/✗不符)——是<b>框架打分</b>，不是本人观点、不是LLM、不预测涨跌。基本面经 Finnhub。</div>`;
 }
@@ -2275,6 +2272,7 @@ function renderStockDetail(tk,m,target){
           <div style="display:flex;gap:12px;flex-wrap:wrap">
             ${bar('买点综合',Timing,'#3fb950')}${bar('💰估值面',Value,'#3fb950')}${bar('📈趋势面',Trend,'#58a6ff')}${bar('安全',Risk!=null?100-Risk:null,'#a371f7')}
           </div>
+          <div class="small muted" style="margin-top:4px;font-size:11px">🛡️ 安全 ${Risk!=null?Math.round(100-Risk):'–'}% = 年化波动 <b style="color:var(--text)">${vol!=null?pct(vol*100,0):'–'}</b> + 近1年最大回撤 <b style="color:var(--text)">${mdd!=null?pct(mdd*100,0):'–'}</b>（两者越小越安全；杠杆ETF/高波动小盘股天然偏低，0% 代表波动+回撤都已到极端区间）</div>
           <div class="small muted" style="margin-top:5px;font-size:11px">↑ <b>描述性决策辅助，非涨跌预测</b>：买点=便宜+在涨综合 · 估值面=便不便宜 · 趋势面=在不在涨 · 安全=波动/回撤越小越高。<br>回测(10年2池)：对3月≈无预测力；对12月有<b>弱</b>正相关(仅来自"便宜"，趋势无效)，且<b>近年减弱、价值股近期转负</b>——只当<b>长期相对便宜的弱参考，别重仓押注、别追短线</b>。真正提升靠基本面(待接入)。</div>
           <div class="small" style="margin-top:8px">${rec.advice}<br><span class="muted">依据：${rec.basis.join(' · ')}</span></div>
         </div>
@@ -2814,10 +2812,12 @@ async function renderMyKlines(){
   renderMykCtrls(); renderMykList();
   fetchOptPrices(PORT.positions.map(p=>p.ticker)).then(renderMykList);   // 取持仓现价→左侧显示持仓占比
   const cols = mykView===1?1:(mykView===4?2:3);
-  const chH = mykView===1?'62vh':(mykView===4?'40vh':'30vh');
+  const rows = Math.max(1, Math.ceil(pageTks.length/cols));   // 用行数把图表撑满整块区域，避免底部留白
+  grid.style.height='100%';
   grid.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+  grid.style.gridTemplateRows=`repeat(${rows},minmax(220px,1fr))`;
   const wmap0=_holdWeightMap();
-  grid.innerHTML=pageTks.map(tk=>`<div class="panel cpanel" style="min-height:${chH}"><h3 style="font-size:12px;flex-wrap:wrap;gap:6px"><b>${tk}</b> <span class="small">${_holdTag(tk,wmap0)}</span> <span class="tag" id="mykbadge_${tk}" style="margin-left:0">加载…</span></h3><div id="mykc_${tk}" class="chart"></div></div>`).join('');
+  grid.innerHTML=pageTks.map(tk=>`<div class="panel cpanel" style="min-height:0"><h3 style="font-size:12px;flex-wrap:wrap;gap:6px"><b>${tk}</b> <span class="small">${_holdTag(tk,wmap0)}</span> <span class="tag" id="mykbadge_${tk}" style="margin-left:0">加载…</span></h3><div id="mykc_${tk}" class="chart"></div></div>`).join('');
   await Promise.all(pageTks.map(async tk=>{
     try{
       const d=await yahoo(tk, mykRange, mykInt);
@@ -3063,7 +3063,8 @@ function boot(){
     symbols:[['^GSPC','标普'],['^NDX','纳指'],['^DJI','道指'],['^VIX','VIX'],['QQQ','QQQ']],
     ovOptions:[['','无叠加'],['^VIX','叠VIX'],['^TNX','叠10Y'],['^NDX','叠纳指']]});
   renderAlertBadge();                // 预警徽标
-  refreshTab('dash', true);          // 先把大盘评分拉出来；广度随后
+  refreshTab('dash', true);          // 后台先把大盘评分/广度拉出来(供指标用)
+  refreshTab('market', true);        // 默认显示「市场动向」为主界面
   startTimer();                      // 激活标签每隔 refreshSec 自动重抓
   setTimeout(checkDataHealth, 9000); // 9秒后若仍没拿到实时数据→弹出修复指引
   setInterval(checkDataHealth, 8000);
