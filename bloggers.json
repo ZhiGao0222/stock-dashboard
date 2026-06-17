@@ -1,5 +1,5 @@
 {
-  "updated": "2026-06-17T15:45:13-07:00",
+  "updated": "2026-06-17T16:33:49-07:00",
   "bloggers": [
     {
       "id": "serenity",
@@ -8,7 +8,16 @@
       "reddit": "u/AleaBito",
       "bio": "AI/半导体供应链「瓶颈」分析 · 300K+ 关注",
       "overview": "聚焦 AI 供应链<b>瓶颈</b>：光通信(公开持仓过半) · CPO/光子 · 存储 · 算力/数据中心(neocloud)。点名很多：<b>AAOI</b>(加仓)、<b>NBIS/RKLB/ALAB/CRCL</b>(给了明确目标价)、<b>COHR/LITE/MRVL</b>(光学·已大涨)、<b>AXTI</b>(招牌)；年初还发过 Strong Buy/Buy 评级名单。框架：找不可替代·产能集中·有定价权的瓶颈隐形冠军。",
-      "tickers": ["AAOI", "NBIS", "RKLB", "ALAB", "COHR", "MRVL", "LITE", "AXTI"],
+      "tickers": [
+        "AAOI",
+        "NBIS",
+        "RKLB",
+        "ALAB",
+        "COHR",
+        "MRVL",
+        "LITE",
+        "AXTI"
+      ],
       "posts": [
         {
           "time": "2026-06-04",
@@ -17,9 +26,13 @@
           "rec": "看涨 · 建议关注/加仓（她从 $28 起持续向上加仓）",
           "title": "$AAOI 自 $28 一路加仓——800G/1.6T 光模块需求太猛，执行到位有望翻倍",
           "key": "押注 AI 光互联需求爆发；AAOI 卡位 MSFT Maia / AMZN Trainium 上量的光模块链。",
-          "bullish": ["AAOI"],
+          "bullish": [
+            "AAOI"
+          ],
           "potential": "高 · 她本人称执行到位可能翻倍~三倍（其个人观点·非预测·小盘高波动）",
-          "chain": ["光通信/光学"],
+          "chain": [
+            "光通信/光学"
+          ],
           "detail": "原话大意：$AAOI 是他从 $28 起不断向上加仓的名字之一，认为 800G/1.6T 光模块需求太大、公司执行到位就可能翻倍甚至三倍。这正是你持仓里的 AAOI——她明确看多；但请看「系统买点」对当前买点的客观判断，别只因她看好就追高。（日期由推文ID解码）",
           "url": "https://x.com/aleabitoreddit/status/2062697638500462639"
         },
@@ -30,9 +43,15 @@
           "rec": "看好 CPO 方向（首选 Foci/SIVE；美股受益 LITE、AAOI）",
           "title": "CPO 卡脖子：押 Foci(台股3363)/SIVE，称是 NVDA、TSM 光程序的瓶颈",
           "key": "共封装光学(CPO)上量，连接器/光引擎是瓶颈；并把 LITE 放进 TPU/OCS 受益链、AAOI 进 MSFT Maia/AMZN Trainium 链，认为 InP 或像 HBM 一样成瓶颈。",
-          "bullish": ["LITE", "AAOI"],
+          "bullish": [
+            "LITE",
+            "AAOI"
+          ],
           "potential": "中高 · CPO/光互联 2026 上量",
-          "chain": ["光通信/光学", "代工/封装"],
+          "chain": [
+            "光通信/光学",
+            "代工/封装"
+          ],
           "detail": "6/11 观点：看好 CPO 方向的 Foci（ITRI 分拆、Himax 的 CPO 伙伴、台股3363）与 SIVE（Sivers，美股仅 OTC SIVEF，Robinhood 不可买）——认为它们是 NVDA/TSM 光程序的瓶颈。美股可买的相关受益：LITE(光器件)、AAOI(光模块)。注：Foci/SIVE 非美股主板，系统买点取不到价属正常。",
           "url": "https://x.com/aleabitoreddit"
         },
@@ -43,9 +62,28 @@
           "rec": "开年评级名单：Strong Buy 一组 + Buy 一组（见下，含海外票）",
           "title": "2026 开年评级：Strong Buy / Buy 一大串",
           "key": "给一篮子票打了评级，多数集中在 AI 算力/光通信/存储/算力金融。",
-          "bullish": ["AXTI", "TSM", "META", "SMCI", "INTC", "HIMS", "NBIS", "IREN", "NVDA", "MU", "AMKR", "AAOI", "COHR", "LITE"],
+          "bullish": [
+            "AXTI",
+            "TSM",
+            "META",
+            "SMCI",
+            "INTC",
+            "HIMS",
+            "NBIS",
+            "IREN",
+            "NVDA",
+            "MU",
+            "AMKR",
+            "AAOI",
+            "COHR",
+            "LITE"
+          ],
           "potential": "评级类 · 方向性参考",
-          "chain": ["算力/AI基建", "光通信/光学", "存储"],
+          "chain": [
+            "算力/AI基建",
+            "光通信/光学",
+            "存储"
+          ],
           "detail": "1/1 评级原文 —— Strong Buy: TTD SMCI AIRO INTC HIMS AXTI TSM NBIS CIFR Samsung HUT IREN WULF GLXY TSSI META ETOR CRCL；Buy: KRKNF ONDS GEMI NVDA MU AMKR SK海力士 SNAP RDDT AAOI COHR FISV FLY DJT LITE。(Samsung/SK海力士/KRKNF 等海外票不可在 Robinhood 买；评级为其本人观点、非投资建议。日期由推文ID解码=1/2发布)",
           "url": "https://x.com/aleabitoreddit/status/2007071108831338685"
         },
@@ -56,9 +94,17 @@
           "rec": "明确目标价(本人观点)：NBIS PT$400/1Y、RKLB PT$500/5Y、ALAB PT$250/6M、CRCL PT$150/8M",
           "title": "组合调仓+目标价：NBIS $92→$400、RKLB $43→$500、ALAB $143→$250、CRCL $72→$150",
           "key": "按他的股票排名表重配组合，给每只设了目标价与时间框架（均为其本人观点、未核实）。",
-          "bullish": ["NBIS", "RKLB", "ALAB", "CRCL"],
+          "bullish": [
+            "NBIS",
+            "RKLB",
+            "ALAB",
+            "CRCL"
+          ],
           "potential": "他设的目标价：NBIS +335%/1年、RKLB +1060%/5年、ALAB +74%/6月、CRCL +108%/8月（本人观点·非预测·高波动）",
-          "chain": ["算力/AI基建", "航天/卫星"],
+          "chain": [
+            "算力/AI基建",
+            "航天/卫星"
+          ],
           "detail": "2025-11-20 原帖(日期由推文ID解码)：基于其股票排名表逐只分析并重配组合——$NBIS @$92 目标$400(1年)、$RKLB @$43 目标$500(5年)、$CRCL @$72 目标$150(8月)、$ALAB @$143.4 目标$250(6月) 等。⚠️ 这是去年11月的帖，价位已变；目标价/时间为其本人设定、未核实，参考即可、看「系统买点」当前情况。",
           "url": "https://x.com/aleabitoreddit/status/1991452423186182524"
         },
@@ -69,9 +115,14 @@
           "rec": "看好 COHR（英伟达 $2B 光学投资分给 COHR/LITE）",
           "title": "COHR：下一代 ASIC 的光子受益，英伟达 $2B 光学投资标的之一",
           "key": "NVDA 把 $2B 光学投资分给 COHR 与 LITE；COHR 受益下一代 ASIC 的光子部署。",
-          "bullish": ["COHR", "LITE"],
+          "bullish": [
+            "COHR",
+            "LITE"
+          ],
           "potential": "高 · 2026 YTD COHR +107%、LITE +138%（已大涨，注意追高）",
-          "chain": ["光通信/光学"],
+          "chain": [
+            "光通信/光学"
+          ],
           "detail": "他指 NVDA 的 $2B 光学投资分给 COHR 和 LITE；COHR 受益下一代 ASIC 的光子放量，LITE 在几乎每个超大厂 ASIC 部署里都有、且 Google TPU 的 BOM 很大。注意这两只 2026 已大涨(COHR +107%/LITE +138%)，看「系统买点」别追高。(综合多篇报道·无单条确切日期)",
           "url": "https://x.com/aleabitoreddit"
         },
@@ -82,9 +133,14 @@
           "rec": "MRVL 长期看多（称 'really good long term long'）",
           "title": "MRVL：英伟达 $2B 验证 Marvell + Celestial AI 的 CPO 光纤路线",
           "key": "他认为 NVDA 的 $2B 投资验证了 Marvell 与 Celestial AI 的光纤 CPO 路线图，当长期底仓看。",
-          "bullish": ["MRVL"],
+          "bullish": [
+            "MRVL"
+          ],
           "potential": "长期 · 2026 YTD MRVL +228%（已大涨）",
-          "chain": ["光通信/光学", "算力/AI基建"],
+          "chain": [
+            "光通信/光学",
+            "算力/AI基建"
+          ],
           "detail": "他把 MRVL 形容为 'really good long term long'(很好的长期多头)，认为英伟达 $2B 投资验证了 Marvell + Celestial AI 的光纤 CPO 路线。注意 MRVL 2026 已涨 +228%，看「系统买点」判断当前是否还适合入。(综合报道·无单条确切日期)",
           "url": "https://x.com/aleabitoreddit"
         },
@@ -95,9 +151,16 @@
           "rec": "算力/数据中心分桶：NBIS/WULF/CIFR=Mag7合同, IREN/BITF=算力, TSSI≈SMCI",
           "title": "算力/数据中心怎么分桶：neocloud vs 矿转算力",
           "key": "把算力票分类：NBIS/WULF/CIFR 接 Mag7 大厂合同；IREN/BITF 偏算力租赁；TSSI 类似 SMCI(服务器/集成)。",
-          "bullish": ["NBIS", "IREN", "CIFR", "TSSI"],
+          "bullish": [
+            "NBIS",
+            "IREN",
+            "CIFR",
+            "TSSI"
+          ],
           "potential": "分类/方法 · 高波动算力主题",
-          "chain": ["算力/AI基建"],
+          "chain": [
+            "算力/AI基建"
+          ],
           "detail": "他对算力/数据中心票分桶：$NBIS/$WULF/$CIFR 是 Mag7(大厂)合同的载体；$IREN/$BITF 偏算力；$TSSI 类似 $SMCI(服务器/集成)；BITF 等矿企转算力。属高波动主题，控仓为上。(综合·无单条确切日期)",
           "url": "https://x.com/aleabitoreddit"
         },
@@ -108,9 +171,14 @@
           "rec": "复盘成名旧仓 · 已大涨，非新入场建议",
           "title": "AXTI（InP 磷化铟衬底）——招牌成名作，$12 喊到 $70",
           "key": "InP 衬底是光通信/激光器的卡脖子材料，全球产能高度集中、有定价权。",
-          "bullish": ["AXTI"],
+          "bullish": [
+            "AXTI"
+          ],
           "potential": "高 · 1.6T 光模块升级 + InP 供给紧张",
-          "chain": ["光通信/光学", "半导体材料"],
+          "chain": [
+            "光通信/光学",
+            "半导体材料"
+          ],
           "detail": "他把 InP 衬底视为光模块上行周期里被忽视的根部环节——下游 1.6T/CPO 放量需要更多 InP 激光，而衬底供给被少数厂家垄断、扩产慢。早期在 r/wallstreetbets 以 u/AleaBito 发表详细论文，$12 建仓、最高约 +1000%。这是成名旧仓(回顾性质)，不等于现在是好买点——看「系统买点」。也是你持仓里的 AXTI。",
           "url": "https://x.com/aleabitoreddit"
         },
@@ -123,33 +191,11 @@
           "key": "像 20% 石油过一个海峡那样，AI 光子建设依赖少数单一/双寡头卡脖子环节——找到它、持有它。",
           "bullish": [],
           "potential": "方法论 · 适合对照本工具「产业链」标签一起看",
-          "chain": ["产业链/命门"],
+          "chain": [
+            "产业链/命门"
+          ],
           "detail": "300K+ 关注；自述前 AI 研究者、Nature 作者、RISC-V 基金会成员、2018 拒绝带队 NVIDIA AI——这些为其本人宣称、未经独立核实，请自行甄别。其「Chokepoint(卡脖子)理论」与本台「产业链/命门」「光通信/存储」高度重合，可作线索来源，自行验证、控仓、设止损。",
           "url": "https://x.com/aleabitoreddit"
-        }
-      ]
-    },
-    {
-      "id": "freedomby40",
-      "name": "Freedom By 40",
-      "handle": "@Freedom_By_40",
-      "reddit": "",
-      "bio": "技术分析(图表)派 · 美股 / 比特币 / 加密 · Patreon 订阅制",
-      "overview": "<b>技术分析派</b>(非基本面)：用图表的<b>支撑/阻力 · 趋势线 · 动量</b>来判断买卖点，覆盖<b>大盘ETF(SPY/QQQ)、大科技、比特币与加密</b>。与 Serenity(供应链基本面)互补——这位看的是<b>价格结构/择时</b>。⚠️ 具体点位与买卖建议多在其 <b>Patreon($12/月)付费</b> 内，公开免费渠道收录有限；本台<b>只整理公开可见的观点、不搬运付费内容</b>，找到具体喊单时会按日期补进来。技术信号变化快，请只当择时参考、自行验证、控仓止损。",
-      "tickers": ["SPY", "QQQ", "BTC-USD"],
-      "posts": [
-        {
-          "time": "背景",
-          "source": "简介/Patreon",
-          "type": "方法论/分析",
-          "rec": "方法论分享 · 无具体买卖建议",
-          "title": "技术分析派：用图表(支撑/阻力/趋势/动量)交易 美股·比特币·加密",
-          "key": "纯技术面择时，跨 大盘ETF / 大科技 / BTC / 加密；强调价格结构与进出场点，而非公司基本面。",
-          "bullish": [],
-          "potential": "方法论 · 择时/价格结构参考(非涨跌预测)",
-          "chain": [],
-          "detail": "Freedom By 40(@Freedom_By_40)是<b>技术分析</b>内容创作者，Patreon 主页自述「Technical Analysis for Stocks, Bitcoin and Crypto」($12/月、1900+ 帖)。打法=看<b>支撑/阻力、趋势线、均线、动量</b>找买卖点，覆盖 SPY/QQQ 等大盘、大科技与 BTC/加密。⚠️ 截至本次采集，其<b>具体点位/喊单大多在付费 Patreon 内</b>，免费公开渠道未检索到可核实的单条带日期的买卖建议——所以这里先放方法论卡，<b>不编造目标价</b>；之后我做「更新博主」时，只要在 X 等公开渠道看到带日期的明确观点就补进来。技术面信号变化快，仅作<b>择时参考</b>，请结合本台「系统买点」、自行验证、控仓设止损。",
-          "url": "https://x.com/Freedom_By_40"
         }
       ]
     }
