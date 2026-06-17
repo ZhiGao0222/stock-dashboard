@@ -1974,8 +1974,10 @@ function potBuyLine(m){   // 卡片用紧凑一行
 
 /* ---- 参考目标价 = 投行/分析师共识目标价(FMP 优先→Finnhub)；无 key 则保留52周高技术参考 ---- */
 function setRefTgt(mean, price, src, hi, lo){
-  const el=document.getElementById('refTgtLine'); if(!el||mean==null||isNaN(mean))return;
   const up=price?(mean-price)/price*100:null;
+  const st=document.getElementById('sumTgt');   // 同步更新「全维度汇总」里的分析师目标格
+  if(st&&mean!=null&&!isNaN(mean)) st.innerHTML=`$${fmt(mean,2)} · 上行 <b style="color:${(up||0)>=0?'#3fb950':'#f85149'}">${up!=null?(up>=0?'+':'')+fmt(up,1)+'%':'–'}</b> <span class="muted">(${src})</span>`;
+  const el=document.getElementById('refTgtLine'); if(!el||mean==null||isNaN(mean))return;
   el.innerHTML=`参考目标价 <b>$${fmt(mean,2)}</b> · 上行 <b style="color:${(up||0)>=0?'#3fb950':'#f85149'}">${up!=null?(up>=0?'+':'')+fmt(up,1)+'%':'–'}</b> <span class="muted">(${src}${(hi!=null&&lo!=null)?' · 高$'+fmt(hi,0)+'/低$'+fmt(lo,0):''})</span>`;
 }
 async function loadAnalystTarget(tk, price){
@@ -2051,14 +2053,34 @@ const INVESTOR_LENSES=[
      _chk('距高回撤>15%',dd!=null?(-dd*100)>15:null,dd!=null?pct(dd*100,1):'–'),
      _chk('不追高(52周位置<70%)',pos!=null?pos<0.7:null,pos!=null?Math.round(pos*100)+'%':'–')];}},
 ];
+/* 「全维度汇总」博主立场：扫 bloggers.json，看追踪的博主有没有点名这只票 */
+function bloggerStanceFor(tk){
+  if(!_blogData||!Array.isArray(_blogData.bloggers))return null;
+  const hits=[];
+  for(const b of _blogData.bloggers){
+    let bull=false, mention=Array.isArray(b.tickers)&&b.tickers.includes(tk);
+    (b.posts||[]).forEach(p=>{ if(Array.isArray(p.bullish)&&p.bullish.includes(tk)) bull=true; });
+    if(bull) hits.push(`${b.name} <span style="color:#3fb950">看涨</span>`);
+    else if(mention) hits.push(`${b.name} 提及`);
+  }
+  return hits.length?hits.join(' · '):null;
+}
+async function loadStockSummary(tk){
+  const el=document.getElementById('sumBlog'); if(!el)return;
+  if(!_blogData){ try{ const r=await fetch('bloggers.json?cb='+Date.now(),{cache:'no-store'}); _blogData=r.ok?await r.json():null; }catch(e){} }
+  const st=bloggerStanceFor(tk);
+  el.innerHTML = st? st+' <span class="muted">(某人的主观观点·非客观信号)</span>' : '<span class="muted">无追踪博主点名此票</span>';
+}
 async function loadInvestorLenses(tk, m){
   const box=document.getElementById('lensBox'); if(!box)return;
   let met=null;
   if(CFG.finnhubKey){ try{ const r=await finnhub('/stock/metric?symbol='+tk+'&metric=all'); met=r&&r.metric?r.metric:null; }catch(e){} }
   const g=k=>(met&&met[k]!=null)?met[k]:null;
+  const lensStat={n:0, bull:0, sum:0};
   const cards=INVESTOR_LENSES.map(L=>{
     const checks=L.fn(m,g), ev=checks.filter(c=>c.ok!=null), pass=checks.filter(c=>c.ok===true).length;
     const score=ev.length?Math.round(pass/ev.length*100):null;
+    if(score!=null){ lensStat.n++; lensStat.sum+=score; if(score>=55) lensStat.bull++; }
     const color=score==null?'#8b949e':(score>=70?'#3fb950':(score>=45?'#d29922':'#f85149'));
     const verdict=score==null?'数据不足':(score>=70?'高度符合':(score>=45?'部分符合':'不太符合'));
     const ch=checks.map(c=>{const ic=c.ok==null?'<span class="muted">–</span>':(c.ok?'<span class="pos">✓</span>':'<span class="neg">✗</span>');
@@ -2068,6 +2090,8 @@ async function loadInvestorLenses(tk, m){
         <span><b style="color:${color}">${verdict}</b>${score!=null?' '+score:''}</span></div>
       <div style="margin-top:5px">${ch}</div></div>`;
   }).join('');
+  const sl=document.getElementById('sumLens');   // 「全维度汇总」里的大师契合格
+  if(sl) sl.innerHTML = lensStat.n? `${lensStat.bull}/${lensStat.n} 框架看好 · 平均 <b>${Math.round(lensStat.sum/lensStat.n)}</b> <span class="muted">${CFG.finnhubKey?'(7框架·基本面)':'(仅价格类2项·填key看全部)'}</span>` : '<span class="muted">需基本面key(⚙设置)</span>';
   box.innerHTML=`<h3 style="margin:10px 2px 4px;font-size:12px;color:var(--muted)">🎓 投资大师视角（规则化套用其公开选股标准 · 非AI生成 · 非涨跌预测）</h3>
     ${CFG.finnhubKey?'':'<div class="small muted" style="margin-bottom:6px">⚠️ 巴菲特/格雷厄姆/林奇/芒格/格林布拉特 等需<b>基本面</b>(标"数据不足")——填一个<b>免费</b> Finnhub key(⚙设置·2分钟·不花钱)即全部解锁逐条✓/✗；<b>马克斯(周期)、克拉曼(回撤/均值)</b> 只用价格，现在就能看。</div>'}
     <div class="grid" style="grid-template-columns:1fr 1fr;gap:8px">${cards}</div>
@@ -2245,7 +2269,20 @@ function renderStockDetail(tk,m,target){
   const bar=(label,val,color)=>`<div style="flex:1;min-width:110px"><div class="small muted">${label} <b style="color:var(--text)">${val!=null?Math.round(val):'–'}</b>%</div>
     <div class="gauge" style="height:7px;margin-top:4px"><i style="width:${val||0}%;background:${color}"></i></div></div>`;
   const metric=(k,v,c='')=>`<div class="panel sig"><div class="meta">${k}</div><div class="val ${c}" style="font-size:17px">${v}</div></div>`;
+  const scColor=Final>=60?'#3fb950':(Final>=45?'#d29922':'#8b949e');
+  const upRef=(upTgt!=null)?upTgt:((hi52&&hi52>price)?(hi52-price)/price*100:null);
+  const sumPanel=`<div class="panel" style="margin-bottom:10px">
+    <h3 style="font-size:13px;margin-bottom:6px">🧭 全维度汇总 <span class="muted small" style="font-weight:400">同一只票的不同视角并列 · 各看各的、未合成一个分</span></h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 14px">
+      <div class="small">⚙️ <b>系统评分</b> <b style="color:${scColor}">${Final}</b>/100 · 买点 <b style="color:${bpt.color}">${bpt.lvl}</b> · 潜力 <b style="color:${pot.color}">${pot.lvl}</b> <span class="muted">技术+估值·实时</span></div>
+      <div class="small">🎓 <b>大师契合</b> <span id="sumLens" class="muted">计算中…</span></div>
+      <div class="small">📊 <b>分析师目标</b> <span id="sumTgt">${upRef!=null?`上行 <b style="color:${upRef>=0?'#3fb950':'#f85149'}">${(upRef>=0?'+':'')+fmt(upRef,1)}%</b> <span class="muted">${upTgt!=null?'(你的目标价)':'(52周高·技术参考)'}</span>`:'<span class="muted">技术参考</span>'}</span></div>
+      <div class="small">📡 <b>博主立场</b> <span id="sumBlog" class="muted">查询中…</span></div>
+    </div>
+    <div class="small muted" style="margin-top:6px;font-size:11px;line-height:1.5">⚠️ 四项是<b>不同种类</b>的信息、<b>故意不合成一个分</b>：系统分客观实时；大师=基本面框架(需⚙Finnhub key看全部)；目标价=卖方/研究观点；博主=某人的主观看法。请自行权衡，非投资建议。</div>
+  </div>`;
   $('#stkResult').innerHTML=`
+    ${sumPanel}
     <div class="panel" style="margin-bottom:10px;border-color:var(--accent)">
       <h3>${name||tk} <span class="tag">${tk}</span> <span class="tag">$${fmt(price,2)}</span>
         <button class="btn small" data-wtierset="watch" data-tk="${tk}" style="margin-left:auto;padding:3px 9px${wtier==='watch'?';background:var(--accent);color:#fff':''}">${wtier==='watch'?'✓ 观察中':'👀 观察'}</button>
@@ -2329,7 +2366,7 @@ function renderStockDetail(tk,m,target){
     <div class="small muted" style="margin-top:8px">行情 Yahoo·基本面/新闻/同业 Finnhub·简介 维基百科。技术估值=相对自身历史位置。所有数字与建议均为量化参考、<b>非投资建议</b>，请控仓+止损。</div>`;
   mountChart('stkChart','stkChartCtrl',tk,{range:'1y',interval:'1d',type:'candle',ma:200,dec:2});
   loadFundamentals(tk, price);
-  loadCompanyInfo(tk, name); loadPeers(tk); loadCompanyNews(tk); loadEarnings(tk); loadAnalysts(tk); loadAnalystTarget(tk, price); loadInvestorLenses(tk, m);
+  loadCompanyInfo(tk, name); loadPeers(tk); loadCompanyNews(tk); loadEarnings(tk); loadAnalysts(tk); loadAnalystTarget(tk, price); loadInvestorLenses(tk, m); loadStockSummary(tk);
 }
 
 /* ---- 主题板块（联网调研的真实当前龙头 + 催化剂，2026-06）+ 长期关注 ---- */
