@@ -1237,25 +1237,28 @@ function gnews(q,lang){
   return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&${loc}`;
 }
 /* ---- 利好/利空 规则引擎：写清楚"利好什么、利空什么"（一条新闻可同时利好A、利空B） ---- */
+/* 新闻规则 = 只认"实质性、会推动整个板块或这家公司"的事件：货币/通胀/地缘/制裁/关税/政策/财报/合同/并购/能源/科技/宏观/加密/汇率。
+   ❌ 不再用"涨/跌/暴跌/大涨/新高"这种纯行情词打利好利空——那是噪音(如"纳指跌"对某只个股毫无意义)。每条带 cat=新闻类别。 */
 const NEWS_RULES=[
-  {kw:['油价上涨','油价涨','油价飙','原油上涨','原油涨','油价大涨','OPEC减产','减产','oil surge','oil jump','crude rise','crude jump'], fx:[['利好','能源股'],['利空','航空/运输']]},
-  {kw:['油价下跌','油价大跌','油价暴跌','油价狂泻','原油下跌','原油暴跌','oil drop','oil fall','oil slump','crude fall'], fx:[['利空','能源股'],['利好','航空/消费']]},
-  {kw:['降息','减息','降准','宽松货币','rate cut','rate cuts'], fx:[['利好','成长/科技/地产'],['利好','黄金']]},
-  {kw:['加息','升息','rate hike','加息预期','higher for longer'], fx:[['利空','成长/地产'],['利好','银行']]},
-  {kw:['通胀超预期','通胀上升','通胀反弹','通胀升温','hot inflation','inflation rises','cpi 超'], fx:[['利空','股市(加息压力)'],['利好','能源/大宗']]},
-  {kw:['通胀放缓','通胀降温','通胀回落','cooling inflation','inflation eases','disinflation'], fx:[['利好','股市/成长股']]},
-  {kw:['战争','开战','战争升级','冲突升级','袭击','导弹','空袭','war ','missile','airstrike','escalat','attack'], fx:[['利好','军工/黄金/能源'],['利空','风险资产/旅游']]},
-  {kw:['停火','和平','和谈','停战','达成停火','ceasefire','truce','peace deal'], fx:[['利空','军工/油价'],['利好','风险资产']]},
-  {kw:['制裁','sanction'], fx:[['利空','被制裁方/风险资产'],['利好','能源/黄金']]},
-  {kw:['加征关税','关税','贸易战','tariff','trade war'], fx:[['利空','出口/制造/进口商'],['利好','本土替代']]},
-  {kw:['英伟达','芯片','半导体','人工智能','AI芯片','chip','semiconductor','nvidia','ai '], fx:[['利好','科技/半导体']]},
-  {kw:['衰退','硬着陆','经济下行','recession','hard landing'], fx:[['利空','周期股'],['利好','防御股/债券']]},
-  {kw:['超预期','利润大涨','营收大增','财报超','回购','beats','earnings beat','record profit'], fx:[['利好','相关个股/板块']]},
-  {kw:['暴跌','大跌','崩盘','抛售','熔断','plunge','crash','selloff','tumble'], fx:[['利空','风险资产']]},
-  {kw:['大涨','飙升','新高','rally','surge','soar','record high'], fx:[['利好','风险资产']]},
-  {kw:['比特币','以太','加密货币','crypto','bitcoin','ethereum'], fx:[['利好','加密板块']]},
-  {kw:['黄金涨','金价','避险','gold rise','safe haven'], fx:[['利好','黄金/避险']]},
-  {kw:['人民币贬值','人民币大跌','yuan fall'], fx:[['利空','中概/进口'],['利好','中国出口']]},
+  {cat:'💵货币政策', kw:['降息','减息','降准','宽松','rate cut','rate cuts','cuts rates','cut rates','cuts interest','lowers rates','lowers interest','rate reduction','dovish','政策转向','pivot'], fx:[['利好','成长/科技/地产'],['利好','黄金']]},
+  {cat:'💵货币政策', kw:['加息','升息','rate hike','rate hikes','raises rates','raise rates','hikes rates','raises interest','higher for longer','hawkish','缩表'], fx:[['利空','成长/地产'],['利好','银行']]},
+  {cat:'💵货币政策', kw:['fomc','美联储','federal reserve','fed ','利率决议','rate decision','点阵图','dot plot','鲍威尔','powell','jackson hole'], fx:[['关注','利率敏感板块']]},
+  {cat:'📈通胀数据', kw:['通胀超预期','通胀上升','通胀反弹','通胀升温','hot inflation','inflation rises','cpi超','cpi beat','ppi超'], fx:[['利空','股市(加息压力)'],['利好','能源/大宗']]},
+  {cat:'📈通胀数据', kw:['通胀放缓','通胀降温','通胀回落','cooling inflation','inflation eases','disinflation','cpi cools'], fx:[['利好','股市/成长股']]},
+  {cat:'⚔️地缘/战争', kw:['战争','开战','战争升级','冲突升级','袭击','导弹','空袭',' war ','missile','airstrike','escalat','invasion','strike on'], fx:[['利好','军工/黄金/能源'],['利空','风险资产/旅游']]},
+  {cat:'🕊️地缘/缓和', kw:['停火','和平','和谈','停战','ceasefire','truce','peace deal'], fx:[['利空','军工/油价'],['利好','风险资产']]},
+  {cat:'🚫制裁/出口管制', kw:['制裁','出口管制','禁运','sanction','export control','entity list','blacklist','curbs'], fx:[['利空','被制裁方/供应链'],['利好','本土替代']]},
+  {cat:'🧾关税/贸易', kw:['加征关税','关税','贸易战','tariff','tariffs','trade war','import duty'], fx:[['利空','出口/制造/进口商'],['利好','本土替代']]},
+  {cat:'🏛️政策/监管', kw:['法案','立法','监管','反垄断','审查','禁令','补贴','行政令','executive order','antitrust','regulation','subsidy','chips act','bill passes','probe into'], fx:[['关注','相关板块(看方向)']]},
+  {cat:'📄财报/业绩', kw:['财报','业绩','earnings','quarterly results','营收','revenue','指引','guidance','raises guidance','beats','earnings beat','record profit','利润大涨','营收大增','回购','buyback','不及预期','misses','cuts guidance','盈利预警','profit warning'], fx:[]},
+  {cat:'🤝大合同/订单', kw:['大单','大订单','订单','中标','签约','采购协议','合同',' deal','contract','awarded','order book','backlog','supply agreement','wins contract','secures'], fx:[]},
+  {cat:'🔀并购/投资', kw:['收购','并购','合并','要约','私有化','入股','战略投资','acquire','acquisition','merger','takeover','buyout','stake in','invests in'], fx:[]},
+  {cat:'🛢️能源/油价', kw:['油价上涨','油价涨','油价飙','原油上涨','OPEC减产','减产','oil surge','oil jump','crude rise'], fx:[['利好','能源股'],['利空','航空/运输']]},
+  {cat:'🛢️能源/油价', kw:['油价下跌','油价大跌','油价暴跌','原油下跌','oil drop','oil fall','oil slump'], fx:[['利空','能源股'],['利好','航空/消费']]},
+  {cat:'💻科技/AI产业', kw:['ai芯片','算力','数据中心','大模型','gpu订单','capex','扩产','产能','data center','accelerator','tape-out'], fx:[['利好','科技/半导体/算力链']]},
+  {cat:'📉宏观/衰退', kw:['衰退','硬着陆','经济下行','recession','hard landing','裁员','layoffs','失业率上升'], fx:[['利空','周期股'],['利好','防御/债券']]},
+  {cat:'🪙加密', kw:['比特币','以太','加密货币','crypto','bitcoin','ethereum','spot etf','现货etf'], fx:[['利好','加密/COIN/MSTR']]},
+  {cat:'💱汇率', kw:['人民币贬值','人民币大跌','yuan falls','美元走强','dollar surges'], fx:[['利空','中概/进口'],['利好','出口']]},
 ];
 /* 公司名/别名→代码：用于把新闻"细分到具体个股"(命中则比"板块"更具体) */
 const STOCK_ALIASES={
@@ -1276,24 +1279,23 @@ function detectTickers(title){
   }
   return found.slice(0,3);
 }
+// 方向只看"实质性催化词"，绝不看 涨/跌/rally/plunge 这种行情词(那对个股没意义)
+const MAT_BULL=['超预期','beats','earnings beat','record profit','利润大涨','营收大增','raises guidance','上调指引','回购','buyback','中标','awarded','wins contract','获批','approved','大单','大订单','收购','acquire','战略投资','partnership','upgrade'];
+const MAT_BEAR=['不及预期','逊于预期','misses','missed','below estimates','下调指引','cuts guidance','盈利预警','profit warning','召回','recall','反垄断','调查','probe','诉讼','lawsuit','下调评级','downgrade','裁员','layoffs','禁令','制裁','sanction','推迟','delay'];
 function tagNews(title){
-  const x=title.toLowerCase();
-  const has=kw=> title.includes(kw)||x.includes(kw.toLowerCase());
-  // 整条新闻的多空倾向(关键词)
-  const BULL=['利好','超预期','大涨','回升','复苏','反弹','beats','beat','gain','surge','soar','jump','rally','rise','record high','upgrade','raises','tops'],
-        BEAR=['利空','下跌','下滑','担忧','警告','风险','危机','fall','drop','plunge','slump','tumble','sink','miss','cuts','downgrade','warn','sell-off','slides'];
-  let sc=0; BULL.forEach(k=>{if(has(k))sc++}); BEAR.forEach(k=>{if(has(k))sc--});
-  const dirOf=()=> sc>0?'利好':(sc<0?'利空':'中性');
-  // ① 细分到具体个股(命中公司名→代码)
-  const stockChips=detectTickers(title).map(tk=>({dir:dirOf(),target:tk,stock:true}));
-  // ② 板块级(规则引擎)
-  const secChips=[]; const seen=new Set();
-  for(const r of NEWS_RULES){ if(r.kw.some(has)){ for(const [dir,target] of r.fx){
-    const k=dir+target; if(!seen.has(k)){ seen.add(k); secChips.push({dir,target}); } } } }
-  // 个股优先(更具体)，其后接板块；都没有→给大盘方向
-  let chips=[...stockChips, ...secChips];
-  if(!chips.length) chips.push(sc>0?{dir:'利好',target:'大盘'}:(sc<0?{dir:'利空',target:'大盘'}:{dir:'中性',target:''}));
-  return {chips:chips.slice(0,4)};
+  const t=title||'', x=' '+t.toLowerCase()+' ';
+  const has=kw=> t.includes(kw)||x.includes(kw.toLowerCase());
+  // 命中的"实质性"规则 → 取类别 + 板块chips；没命中任何规则=不是大新闻→不打标(避免"纳指跌"这种噪音)
+  let cat=''; const chips=[], seen=new Set();
+  for(const r of NEWS_RULES){ if(r.kw.some(has)){ if(!cat)cat=r.cat;
+    for(const [dir,target] of (r.fx||[])){ const k=dir+target; if(!seen.has(k)){ seen.add(k); chips.push({dir,target}); } } } }
+  // 方向：只用实质催化词
+  let md=0; MAT_BULL.forEach(k=>{if(has(k))md++}); MAT_BEAR.forEach(k=>{if(has(k))md--});
+  if(!cat && md!==0) cat='⭐公司动态';   // 有实质催化(财报/召回/评级/收购…)但不属宏观类→归"公司动态"，仍算大新闻
+  const dir = cat? (md>0?'利好':(md<0?'利空':'关注')) : '';
+  // 命中公司名 + 是大新闻 → 个股方向chip(放最前，最具体)
+  if(cat){ detectTickers(t).slice(0,2).forEach(tk=>{ const k='S'+tk; if(!seen.has(k)){ seen.add(k); chips.unshift({dir:dir||'关注',target:tk,stock:true}); } }); }
+  return {cat, dir, chips:chips.slice(0,4)};
 }
 // 取一个 RSS 的条目：用 rss2json（带CORS、直连、对 Google News 最稳）；失败即抛错→上层回退缓存
 async function fetchFeed(t,lang){
@@ -1316,11 +1318,13 @@ function renderFeed(i,items,stale){
   $('#feed'+i).innerHTML = (stale?'<div class="small muted" style="padding:2px 0 6px">（缓存·抓取失败时显示上次内容）</div>':'') +
     items.map(n=>{
       const g=tagNews(n.title);
-      const tags=g.chips.map(c=>{const cls=c.dir==='利好'?'buy':(c.dir==='利空'?'sell':'');
-        return `<span class="pill ${cls}">${c.dir}${c.target?' '+(c.stock?'📈<b>'+c.target+'</b>':c.target):''}</span>`;}).join(' ');
+      const catTag=g.cat?`<span class="pill" style="background:rgba(88,166,255,.16);color:#79c0ff">${g.cat}</span>`:'';
+      const chipTags=g.cat?g.chips.map(c=>{const cls=c.dir==='利好'?'buy':(c.dir==='利空'?'sell':'');
+        return `<span class="pill ${cls}">${c.dir}${c.target?' '+(c.stock?'📈<b>'+c.target+'</b>':c.target):''}</span>`;}).join(' '):'';
+      const tags=[catTag,chipTags].filter(Boolean).join(' ');
       return `<div class="news-item">
         <a class="t" href="${n.link}" target="_blank" rel="noopener">${n.title}</a>
-        <div style="margin:4px 0;display:flex;gap:4px;flex-wrap:wrap">${tags}</div>
+        ${tags?`<div style="margin:4px 0;display:flex;gap:4px;flex-wrap:wrap">${tags}</div>`:''}
         <div class="m">${n.source} · ${timeAgo(n.date)}</div></div>`;
     }).join('');
 }
@@ -1374,15 +1378,16 @@ async function loadNews(){
   setSrc('news', allTitles.length?'正常':'失败');
   $('#newsUpdated').textContent='更新于 '+new Date().toLocaleTimeString('zh-CN');
 }
-/* 汇总所有标题→当前最利好/最利空板块（追涨/杀跌方向参考） */
+/* 汇总所有标题→当前新闻面偏多/偏空板块（由重大新闻催化驱动，非行情涨跌） */
 function renderSectorMood(titles){
-  const skip=new Set(['大盘','本土替代','相关个股','板块','被制裁方']);
+  const skip=new Set(['大盘','本土替代','相关个股','板块','被制裁方','利率敏感板块','防御','债券']);
   const tally={};
   for(const title of titles){
     for(const c of tagNews(title).chips){
-      if(c.dir==='中性'||!c.target)continue;
+      if(c.dir!=='利好'&&c.dir!=='利空')continue;   // 只统计明确利好/利空(跳过"关注"和个股chip)
+      if(c.stock||!c.target)continue;
       for(let tg of c.target.split('/')){ tg=tg.trim();
-        if(!tg||skip.has(tg))continue;
+        if(!tg||tg.includes('(')||tg.includes('相关')||skip.has(tg))continue;
         tally[tg]=tally[tg]||{b:0,s:0};
         if(c.dir==='利好')tally[tg].b++; else tally[tg].s++;
       }
@@ -1394,11 +1399,11 @@ function renderSectorMood(titles){
   const chip=(t,n,cls)=>`<span class="pill ${cls}">${t} ${n>0?'+':''}${n}</span>`;
   $('#sectorMood').innerHTML=`
     <div class="small" style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:3px">
-      <b style="color:var(--green2)">🟢 最利好(追涨参考)</b>
-      ${bull.length?bull.map(a=>chip(a.t,a.net,'buy')).join(' '):'<span class="muted">暂无明显方向</span>'}</div>
+      <b style="color:var(--green2)">🟢 新闻面偏多板块</b>
+      ${bull.length?bull.map(a=>chip(a.t,a.net,'buy')).join(' '):'<span class="muted">近期无重大新闻催化</span>'}</div>
     <div class="small" style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
-      <b style="color:var(--red)">🔴 最利空(杀跌参考)</b>
-      ${bear.length?bear.map(a=>chip(a.t,a.net,'sell')).join(' '):'<span class="muted">暂无明显方向</span>'}</div>`;
+      <b style="color:var(--red)">🔴 新闻面偏空板块</b>
+      ${bear.length?bear.map(a=>chip(a.t,a.net,'sell')).join(' '):'<span class="muted">近期无重大新闻催化</span>'}</div>`;
 }
 function timeAgo(d){
   if(!d)return''; const t=new Date(d).getTime(); if(isNaN(t))return d;
@@ -2221,21 +2226,29 @@ async function loadAnalysts(tk){
 }
 async function loadCompanyNews(tk){
   const box=document.getElementById('coNews'); if(!box)return;
-  if(!CFG.finnhubKey){ box.innerHTML='<div class="small muted">填 Finnhub key 后显示该公司最新新闻(自动标利好/利空)。</div>'; return; }
+  if(!CFG.finnhubKey){ box.innerHTML='<div class="small muted">填 Finnhub key 后显示该公司最新新闻(只标重大类型：财报/大合同/并购/政策/监管等，不按大盘涨跌瞎标)。</div>'; return; }
   box.innerHTML='<div class="muted small">加载公司新闻…</div>';
   try{
     const to=new Date(), from=new Date(Date.now()-30*864e5);
     const dd=d=>d.toISOString().slice(0,10);
     const news=await finnhub(`/company-news?symbol=${tk}&from=${dd(from)}&to=${dd(to)}`);
     if(!Array.isArray(news)||!news.length){ box.innerHTML='<div class="small muted">近30天暂无公司新闻(或免费额度限制)。</div>'; return; }
-    box.innerHTML=news.slice(0,10).map(n=>{
+    const rows=news.slice(0,12).map(n=>{
       const g=tagNews(n.headline||'');
-      const tags=g.chips.map(c=>`<span class="pill ${c.dir==='利好'?'buy':(c.dir==='利空'?'sell':'')}">${c.dir}${c.target?' '+(c.stock?'📈<b>'+c.target+'</b>':c.target):''}</span>`).join(' ');
-      const dt=n.datetime?timeAgo(new Date(n.datetime*1000).toISOString()):'';
-      return `<div class="news-item"><a class="t" href="${n.url}" target="_blank" rel="noopener">${n.headline}</a>
-        <div style="margin:3px 0;display:flex;gap:4px;flex-wrap:wrap">${tags}</div>
-        <div class="m">${n.source||''} · ${dt}</div></div>`;
-    }).join('');
+      let tags='';
+      if(g.cat){   // 只有"重大新闻"才标：类别 + 对本公司方向 + 相关板块；其它公司新闻不强行打利好利空
+        const catTag=`<span class="pill" style="background:rgba(88,166,255,.16);color:#79c0ff">${g.cat}</span>`;
+        const dirTag=(g.dir==='利好'||g.dir==='利空')?`<span class="pill ${g.dir==='利好'?'buy':'sell'}">${g.dir} 📈<b>${tk}</b></span>`:'';
+        const secTags=g.chips.filter(c=>!c.stock).map(c=>`<span class="pill ${c.dir==='利好'?'buy':(c.dir==='利空'?'sell':'')}">${c.dir} ${c.target}</span>`).join(' ');
+        tags=[catTag,dirTag,secTags].filter(Boolean).join(' ');
+      }
+      return {tags, n, isBig:!!g.cat};
+    });
+    // 重大新闻(有类别)排前面，普通公司新闻在后
+    rows.sort((a,b)=>(b.isBig?1:0)-(a.isBig?1:0));
+    box.innerHTML=rows.map(r=>`<div class="news-item"><a class="t" href="${r.n.url}" target="_blank" rel="noopener">${r.n.headline}</a>
+      ${r.tags?`<div style="margin:3px 0;display:flex;gap:4px;flex-wrap:wrap">${r.tags}</div>`:''}
+      <div class="m">${r.n.source||''} · ${r.n.datetime?timeAgo(new Date(r.n.datetime*1000).toISOString()):''}</div></div>`).join('');
   }catch(e){ box.innerHTML='<div class="note">公司新闻抓取失败(检查 key/额度)。</div>'; }
 }
 let lastAnalyzed='';
