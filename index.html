@@ -348,6 +348,7 @@
     <div class="panel cpanel" style="flex:1 1 auto">
       <h3>我的持仓 <span class="tag" id="portUpdated"></span></h3>
       <div class="note" style="flex:0 0 auto;margin-bottom:8px;font-size:11.5px;line-height:1.5">ℹ️ <b>价格实时、持仓手动</b>：本工具不连接你的 Robinhood 账户（券商无公开API，且不应交出密码）。<b>现价/盈亏按实时价自动算</b>，但<b>股数与成本是你手动录入的</b>——每次在 Robinhood 买卖后，请来这里更新（📋批量粘贴最快），总盈亏才会和 Robinhood 对上。</div>
+      <div id="portWarn" style="flex:0 0 auto"></div>
       <div class="row" style="margin-bottom:10px;flex:0 0 auto">
         <button class="btn primary" id="addPos">+ 添加持仓</button>
         <button class="btn" id="pasteBtn">📋 批量粘贴</button>
@@ -1410,6 +1411,7 @@ async function refreshPrices(){
       };
       checkAlerts(p.ticker, price, null);   // 持仓支持价格预警(评分需个股页)
     }catch(e){priceCache[p.ticker]={error:true};}
+    renderPort();   // 每只到位/失败就立即刷新，好的票不必等最慢或无效的那只
   }));
   renderPort();
   $('#portUpdated').textContent='更新于 '+new Date().toLocaleTimeString('zh-CN');
@@ -1439,7 +1441,7 @@ function renderPort(){
   const grand=totVal;   // 只算股票市值(不含现金)
   $('#portBody').innerHTML = rows.length? rows.map(r=>{
     const weight=grand?(r.val/grand*100):null;
-    const err=r.c.error?'<span class="muted">取价失败</span>':'';
+    const err=r.c.error?'<span class="neg" title="取不到行情：代码可能打错了(如 GOOGL≠GOOL、AXTI≠AXTO)，或暂时抓取失败">⚠️代码无效?</span>':'';
     return `<tr>
       <td><b>${r.p.ticker}</b>${r.p.note?`<div class="muted small">${r.p.note}</div>`:''}</td>
       <td>${fmtSh(r.p.shares)}</td>
@@ -1459,6 +1461,13 @@ function renderPort(){
       <td><button class="iconbtn" data-edit="${r.idx}">✎</button><button class="iconbtn" data-del="${r.idx}">🗑</button></td>
     </tr>`;}).join('') : `<tr><td colspan="16" class="muted" style="text-align:center;padding:24px">还没有持仓，点"+ 添加持仓"。</td></tr>`;
 
+  // 取价失败(最常见=代码打错)→醒目红字警告，并提示账户总值不含它们
+  const failedTks = rows.filter(r=>r.c.error).map(r=>r.p.ticker);
+  const pw=$('#portWarn');
+  if(pw) pw.innerHTML = failedTks.length
+    ? `<div class="note" style="border-color:var(--red);background:rgba(248,81,73,.12);color:#ffc2bd;margin-bottom:8px;line-height:1.55">⚠️ <b>${failedTks.length} 只取不到行情，多半是代码打错了</b>：<b>${failedTks.join('、')}</b> —— 它们<b>没算进账户总值</b>(所以总值会偏低)。请点该行 <b>✎</b> 改对代码，或用「📋批量粘贴」勾选"覆盖"重录。常见错法：<b>GOOGL≠GOOL · AXTI≠AXTO</b>。</div>`
+    : '';
+
   // ===== 账户层面盈亏(用户设定锚点)：总盈亏=账户总值−初始资金；今日盈亏=账户总值−昨日收盘账户值 =====
   const cash=Number(PORT.cash)||0;
   const acctVal=totVal+cash;                       // 账户总值=股票市值+现金
@@ -1472,7 +1481,7 @@ function renderPort(){
   rows.forEach(r=>{ const w=(grand&&r.val)?r.val/grand*100:0; if(w>maxW){maxW=w; maxName=r.p.ticker;} });
   const avgRsi = rows.filter(r=>r.c.rsi14!=null).reduce((a,r,_,arr)=>a+r.c.rsi14/arr.length,0);
   $('#portSummary').innerHTML=[
-    sumCard('账户总值',`$${fmt(acctVal,2)}`,`股票 $${fmt(totVal,2)}${cash?` · 现金 $${fmt(cash,2)}`:''}`),
+    sumCard('账户总值',`$${fmt(acctVal,2)}`,`股票 $${fmt(totVal,2)}${cash?` · 现金 $${fmt(cash,2)}`:''}${failedTks.length?` · <span class="neg">⚠️不含${failedTks.length}只取价失败</span>`:''}`),
     sumCard('总盈亏',`${totPl>=0?'+':''}$${fmt(totPl,2)}`,(initCap>0?`vs 初始$${fmt(initCap,0)} · `:'')+pct(totPlPct),totPl>=0?'pos':'neg'),
     sumCard('今日盈亏',`${todayPl>=0?'+':''}$${fmt(todayPl,2)}`,prevClose>0?`vs 昨收$${fmt(prevClose,0)} · ${pct(todayPct)}`:'按昨收(填昨收账户值更准)',todayPl>=0?'pos':'neg'),
     sumCard('最大单仓',`${maxName?maxName+' ':''}${fmt(maxW,1)}%`,'单一最大持仓·集中度'),
