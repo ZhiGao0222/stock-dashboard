@@ -1396,6 +1396,7 @@ function timeAgo(d){
 let priceCache={}; // ticker -> {price,prev,hi,lo,ma200,rsi14}
 async function refreshPrices(){
   $('#portUpdated').textContent='刷新现价中…';
+  renderPort();   // 先立刻把持仓行画出来(股数/成本可见,价格随后填)，避免抓取慢时(尤其托管站)看着"没反应"
   await Promise.all(PORT.positions.map(async p=>{
     try{
       const [{meta,closes}, lp]=await Promise.all([yahoo(p.ticker,'1y','1d'), livePrice(p.ticker)]);
