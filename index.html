@@ -589,9 +589,15 @@ if(!load('newslang_yf',false)){ CFG.newsLang='yf'; saveCfg(); save('newslang_yf'
 let PORT = load('port', {positions:[], cash:0});
 if(PORT.initial==null) PORT.initial=1100;   // 初始资金锚点(总盈亏基准)，可在持仓页改
 // ⭐ 特别关注列表 = 纯手动：默认空白，只有你搜索个股后点"加入特别关注"才进来
-let WATCH = load('watch', null);   // [{ticker,note,addedDate,addedPrice,addedScore}]
+// 代码规范化：美股的"类别股"在 Yahoo 里用连字符，不是点(BRK.B→BRK-B、BRK.A→BRK-A、BF.B→BF-B)。其余(0700.HK等)不动。
+function normTk(s){ s=(s||'').trim().toUpperCase(); return s.replace(/\.([AB])$/,'-$1'); }
+let WATCH = load('watch', null);   // [{ticker,note,addedDate,addedPrice,addedScore,tier}]
 if(!Array.isArray(WATCH)){ WATCH = []; }
 if(!load('watchreset1',false)){ WATCH=[]; save('watch',[]); save('watchreset1',true); }  // 一次性清空旧的自动关注
+if(!load('seed_brkb',false)){   // 一次性把 BRK-B(伯克希尔B) 放进"观察中"(应 Zhi 要求)
+  if(!WATCH.some(w=>w.ticker==='BRK-B')) WATCH.push({ticker:'BRK-B', note:'伯克希尔 B', tier:'watch', addedDate:new Date().toLocaleDateString('zh-CN'), addedPrice:null, addedScore:null});
+  save('watch',WATCH); save('seed_brkb',true);
+}
 const PENDING_TICKERS=[];          // 不再自动标记，保持列表干净
 function load(k,def){try{return JSON.parse(localStorage.getItem('msd_'+k))??def}catch(e){return def}}
 function save(k,v){localStorage.setItem('msd_'+k, JSON.stringify(v))}
@@ -981,6 +987,7 @@ function _resample4h(d){
   return {meta:d.meta, closes:c.slice(), o,h,l,c,t,v, _stale:d._stale};
 }
 async function yahoo(symbol,range='1y',interval='1d'){
+  symbol=normTk(symbol);   // 兜底：BRK.B→BRK-B 等类别股
   if(interval==='4h') return _resample4h(await yahoo(symbol, fitRangeToIv(range,'4h'), '60m'));
   const key='ych:'+symbol+':'+range+':'+interval;
   const path=`/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`;
@@ -2253,7 +2260,7 @@ async function loadCompanyNews(tk){
 }
 let lastAnalyzed='';
 async function analyzeStock(tk,target){
-  tk=(tk||'').trim().toUpperCase(); if(!tk)return; lastAnalyzed=tk;
+  tk=normTk(tk); if(!tk)return; lastAnalyzed=tk;
   $('#stkResult').innerHTML='<div class="panel"><span class="muted">分析 '+tk+' 中…</span></div>';
   let d,lp; try{ [d,lp]=await Promise.all([yahoo(tk,'1y','1d'), livePrice(tk)]); }catch(e){ $('#stkResult').innerHTML='<div class="note">取数失败：代码可能不对，或代理被限流。检查后重试。</div>'; return; }
   if(!d.closes||d.closes.length<60){ $('#stkResult').innerHTML='<div class="note">该标的历史数据太短，无法可靠分析。</div>'; return; }
@@ -2549,7 +2556,7 @@ const TIER_LABEL={watch:'观察中', focus:'重点关注'};
 function tierOf(w){ return (w&&w.tier==='focus')?'focus':'watch'; }   // 旧数据无 tier=观察中
 // 把某只设到指定分组：已在该组→移除；在另一组→切换；不在→新增
 async function setTier(tk, tier){
-  tk=(tk||'').trim().toUpperCase(); if(!tk)return;
+  tk=normTk(tk); if(!tk)return;
   const i=WATCH.findIndex(w=>w.ticker===tk);
   if(i>=0){
     if(tierOf(WATCH[i])===tier){ WATCH.splice(i,1); }   // 再点同一组 = 取消关注
