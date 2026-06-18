@@ -366,6 +366,7 @@
         <span class="small muted">模式</span>
         <button class="ctrlbtn on" data-stratmode="checkup">📋 持仓体检</button>
         <button class="ctrlbtn" data-stratmode="sizer">🧮 配比助手</button>
+        <button class="ctrlbtn" data-stratmode="plans">📁 我的方案</button>
         <i class="ctrlsep"></i><span class="small muted">风格</span>
         <button class="ctrlbtn" data-stratstyle="conservative">保守</button>
         <button class="ctrlbtn on" data-stratstyle="balanced">平衡</button>
@@ -3257,6 +3258,7 @@ async function loadStrategy(){
   const body=document.getElementById('stratBody'); if(!body)return;
   document.querySelectorAll('[data-stratonly]').forEach(el=>el.style.display = el.dataset.stratonly===stratMode?'':'none');
   if(stratMode==='sizer'){ renderSizer(); return; }
+  if(stratMode==='plans'){ renderPlans(); return; }
   body.innerHTML='<div class="muted small" style="padding:8px">计算策略参考中…</div>';
   let items=[];
   if(stratBase==='port' && PORT.positions.length){
@@ -3458,12 +3460,61 @@ function renderPlanChips(){
   const names=Object.keys(SIZER_PLANS);
   box.innerHTML = names.length? ('<span class="small muted" style="align-self:center">已存方案:</span>'+names.map(n=>`<span class="pill" style="cursor:pointer"><span data-planload="${n}">📋 ${n}</span> <span data-plandel="${n}" style="color:var(--red);cursor:pointer" title="删除">✕</span></span>`).join('')) : '';
 }
+/* 📁 我的方案：独立一栏，选方案→按总资金+实时价算出每只「该买多少股」 */
+let curPlan=null;
+function renderPlans(){
+  const body=document.getElementById('stratBody'); if(!body)return;
+  const names=Object.keys(SIZER_PLANS);
+  if(!names.length){ body.innerHTML='<div class="note" style="margin:8px">还没有保存的方案。去『🧮 配比助手』调好占比后点 <b>💾 保存为方案</b>，再回这里看每只该买多少股。</div>'; return; }
+  if(!curPlan||!SIZER_PLANS[curPlan]) curPlan=names[0];
+  const navs=names.map(n=>`<button class="ctrlbtn${curPlan===n?' on':''}" data-planview="${n}">📋 ${n}</button>`).join('');
+  body.innerHTML=`<div class="panel sig" style="margin-bottom:8px">
+    <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center"><span class="small muted">总资金$</span><input id="pl_cap" type="number" value="${SIZER.cap||''}" placeholder="如 1100" style="width:100px"><span class="small muted">(按这笔钱算该买多少股)</span></div>
+    <div class="row" style="gap:5px;flex-wrap:wrap;margin-top:7px;align-items:center"><span class="small muted">方案</span>${navs}
+      <button class="btn small" data-planedit="${curPlan}">✎ 载入配比助手编辑</button>
+      <button class="btn small" data-plandel="${curPlan}" style="color:var(--red)">🗑 删除此方案</button></div></div>
+    <div id="planExec"><div class="muted small" style="padding:6px">读取实时价、计算该买多少股…</div></div>`;
+  renderPlanExec(curPlan);
+}
+async function renderPlanExec(name){
+  const p=SIZER_PLANS[name], out=document.getElementById('planExec'); if(!p||!out)return;
+  const cap=parseFloat((document.getElementById('pl_cap')||{}).value)||0;
+  const tks=Object.keys(p.pcts||{}).filter(t=>p.pcts[t]>0);
+  if(!tks.length){ out.innerHTML='<div class="note" style="margin:6px">此方案没有标的。</div>'; return; }
+  const data={};
+  await Promise.all(tks.map(async tk=>{ try{ const d=await yahoo(tk,'1y','1d'); if(d.closes&&d.closes.length>=30){ const m=computeStock(d.meta,d.closes,null,d.v); data[tk]={price:m.price,buy:buyPointOf(m).lvl}; } }catch(e){} }));
+  if(curPlan!==name) return;
+  const fm=p.firstMode||'buy';
+  const rows=tks.map(tk=>({tk,pct:p.pcts[tk],d:data[tk]})).sort((a,b)=>b.pct-a.pct);
+  const f1Of=buy=> fm==='half'?0.5:(fm==='third'?0.3333:(buy==='合适'?0.5:(buy==='一般'?0.34:0.2)));
+  let totAmt=0, totNow=0;
+  const col=`1fr 52px 64px 78px 78px`;
+  const head=`<div style="display:grid;grid-template-columns:${col};gap:4px;font-size:11px;color:var(--muted);padding:0 2px 4px"><span>票</span><span style="text-align:right">占比</span><span style="text-align:right">现价</span><span style="text-align:right">目标(买够)</span><span style="text-align:right">现在先建</span></div>`;
+  const body2=rows.map(r=>{
+    if(!r.d) return `<div style="display:grid;grid-template-columns:${col};gap:4px;padding:4px 2px;border-bottom:1px solid var(--border)"><span><b>${r.tk}</b></span><span style="text-align:right" class="small">${fmt(r.pct,1)}%</span><span class="small muted" style="grid-column:3/6;text-align:right">取数失败(非美股/代码错)</span></div>`;
+    const amt=cap*r.pct/100, sh=r.d.price?amt/r.d.price:0; totAmt+=amt;
+    const f1=f1Of(r.d.buy), nowAmt=amt*f1, nowSh=r.d.price?nowAmt/r.d.price:0; totNow+=nowAmt;
+    const bc=r.d.buy==='合适'?'#3fb950':(r.d.buy==='一般'?'#d29922':'#f85149');
+    return `<div style="display:grid;grid-template-columns:${col};gap:4px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--border)">
+      <span><a href="#" data-stk="${r.tk}" style="color:var(--text);font-weight:700">${r.tk}</a> <span class="small" style="color:${bc}">${r.d.buy}</span></span>
+      <span style="text-align:right" class="small">${fmt(r.pct,1)}%</span>
+      <span style="text-align:right" class="small muted">$${fmt(r.d.price,2)}</span>
+      <span style="text-align:right"><b>${fmt(sh,sh<10?2:0)}</b>股 <span class="muted small">$${fmt(amt,0)}</span></span>
+      <span style="text-align:right;color:var(--accent)"><b>${fmt(nowSh,nowSh<10?2:0)}</b>股 <span class="muted small">$${fmt(nowAmt,0)}</span></span></div>`;
+  }).join('');
+  out.innerHTML=`<div class="panel sig"><div class="top"><span class="name">📋 ${name} <span class="muted small">${cap?'总资金 $'+fmt(cap,0):'未填总资金→只看占比'}</span></span></div>
+    ${cap?head+body2:'<div class="small" style="color:var(--amber);padding:6px">填上面的「总资金$」才能算出该买多少股。</div>'+head+body2}
+    ${cap?`<div class="small" style="margin-top:6px">📦 <b>买够目标</b>共投入 ≈$${fmt(totAmt,0)}（占总资金${fmt(totAmt/cap*100,0)}%）；<b style="color:var(--accent)">现在先建</b>合计 ≈$${fmt(totNow,0)}，其余 ≈$${fmt(totAmt-totNow,0)} 留作回踩/深跌补仓。</div>`:''}
+    <div class="small muted" style="margin-top:4px">「目标」=按方案占比买满的股数；「现在先建」=首批先买的股数(其余分批补)。价格实时、零股按券商支持的小数股。<b>参考·非投资建议</b>。</div></div>`;
+}
 function sizerSavePlan(){
   const nm=((document.getElementById('sz_planname')||{}).value||'').trim()||('方案'+(Object.keys(SIZER_PLANS).length+1));
   const pcts={}; document.querySelectorAll('.szpct').forEach(i=>pcts[i.dataset.tk]=parseFloat(i.value)||0);
   if(!Object.keys(pcts).length){ return; }
-  SIZER_PLANS[nm]={safe:SIZER.safe,etf:SIZER.etf,growth:SIZER.growth,deploy:SIZER.deploy,method:SIZER.method,tranches:SIZER.tranches,cap:SIZER.cap,maxw:SIZER.maxw,pcts}; save('sizerPlans',SIZER_PLANS);
-  renderPlanChips(); const m=document.getElementById('szSaveMsg'); if(m){ m.textContent='已定格「'+nm+'」✓'; setTimeout(()=>{if(m)m.textContent='';},2600); }
+  SIZER_PLANS[nm]={safe:SIZER.safe,etf:SIZER.etf,growth:SIZER.growth,deploy:SIZER.deploy,method:SIZER.method,tranches:SIZER.tranches,cap:SIZER.cap,maxw:SIZER.maxw,stepMode:SIZER.stepMode,stopMode:SIZER.stopMode,firstMode:SIZER.firstMode,pcts}; save('sizerPlans',SIZER_PLANS);
+  curPlan=nm; stratMode='plans';   // 保存后跳到「📁 我的方案」栏，显示该买多少股
+  document.querySelectorAll('[data-stratmode]').forEach(b=>b.classList.toggle('on',b.dataset.stratmode==='plans'));
+  loadStrategy();
 }
 function sizerLoadPlan(nm){
   const p=SIZER_PLANS[nm]; if(!p)return;
@@ -3502,7 +3553,9 @@ document.addEventListener('click',e=>{
   const sba=e.target.closest('[data-sizerbal]'); if(sba){ sizerRebalance(); return; }
   const sps=e.target.closest('[data-sizersave]'); if(sps){ sizerSavePlan(); return; }
   const spl=e.target.closest('[data-planload]'); if(spl){ sizerLoadPlan(spl.dataset.planload); return; }
-  const spd=e.target.closest('[data-plandel]'); if(spd){ delete SIZER_PLANS[spd.dataset.plandel]; save('sizerPlans',SIZER_PLANS); renderPlanChips(); return; }
+  const spv=e.target.closest('[data-planview]'); if(spv){ curPlan=spv.dataset.planview; renderPlans(); return; }
+  const spe=e.target.closest('[data-planedit]'); if(spe){ stratMode='sizer'; document.querySelectorAll('[data-stratmode]').forEach(b=>b.classList.toggle('on',b.dataset.stratmode==='sizer')); sizerLoadPlan(spe.dataset.planedit); return; }
+  const spd=e.target.closest('[data-plandel]'); if(spd){ delete SIZER_PLANS[spd.dataset.plandel]; save('sizerPlans',SIZER_PLANS); if(stratMode==='plans'){ curPlan=null; renderPlans(); } else renderPlanChips(); return; }
   const sg=e.target.closest('[data-sizergo]'); if(sg){ _szFrozen=null; computeSizer(); return; }
   const sk=e.target.closest('#strategy [data-stk]'); if(sk){ e.preventDefault(); $('#stkInput').value=sk.dataset.stk; openTab('stock'); analyzeStock(sk.dataset.stk); return; }
   const ss=e.target.closest('[data-stratstyle]'); if(ss){ stratStyle=ss.dataset.stratstyle; document.querySelectorAll('[data-stratstyle]').forEach(b=>b.classList.toggle('on',b===ss)); loadStrategy(); return; }
@@ -3512,6 +3565,7 @@ document.addEventListener('click',e=>{
 const _SZF={sz_safe:'safe',sz_etf:'etf',sz_growth:'growth',sz_deploy:'deploy',sz_cap:'cap',sz_max:'maxw'};
 document.addEventListener('input',e=>{   // 手动改占比/总资金→只更新文字与合计(不动其它输入框，不打扰你输入)
   if(_SZF[e.target.id]){ SIZER[_SZF[e.target.id]]=e.target.value; save('sizer',SIZER); }   // 边填边存→任何重渲染都不丢
+  if(e.target.id==='pl_cap'){ SIZER.cap=e.target.value; save('sizer',SIZER); if(curPlan) renderPlanExec(curPlan); return; }
   if((e.target.classList&&e.target.classList.contains('szpct'))||e.target.id==='sz_cap'){ if(document.querySelector('.szpct')) sizerManualUpdate(); }
 });
 document.addEventListener('change',e=>{   // 改完总仓位(失焦/回车)才按比例配平，避免边打字边跳
@@ -3664,7 +3718,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260618-0055';
+const BUILD='20260618-0120';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
