@@ -2124,9 +2124,9 @@ function bloggerStanceFor(tk){
   if(!_blogData||!Array.isArray(_blogData.bloggers))return null;
   const hits=[];
   for(const b of _blogData.bloggers){
-    let bull=false, mention=Array.isArray(b.tickers)&&b.tickers.includes(tk);
-    (b.posts||[]).forEach(p=>{ if(Array.isArray(p.bullish)&&p.bullish.includes(tk)) bull=true; });
-    if(bull) hits.push(`${b.name} <span style="color:#3fb950">看涨</span>`);
+    let bull=false, zone=null, mention=Array.isArray(b.tickers)&&b.tickers.includes(tk);
+    (b.posts||[]).forEach(p=>{ if(Array.isArray(p.bullish)&&p.bullish.includes(tk)){ bull=true; if(p.zone&&!zone) zone=p.zone; } });
+    if(bull) hits.push(`${b.name} <span style="color:#3fb950">看涨</span>${zone?` <span class="muted">· ${zone}</span>`:''}`);   // 带上其买区=入仓参考点
     else if(mention) hits.push(`${b.name} 提及`);
   }
   return hits.length?hits.join(' · '):null;

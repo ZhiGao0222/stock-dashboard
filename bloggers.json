@@ -1,5 +1,5 @@
 {
-  "updated": "2026-06-17T16:33:49-07:00",
+  "updated": "2026-06-17T17:22:12-07:00",
   "bloggers": [
     {
       "id": "serenity",
@@ -196,6 +196,129 @@
           ],
           "detail": "300K+ 关注；自述前 AI 研究者、Nature 作者、RISC-V 基金会成员、2018 拒绝带队 NVIDIA AI——这些为其本人宣称、未经独立核实，请自行甄别。其「Chokepoint(卡脖子)理论」与本台「产业链/命门」「光通信/存储」高度重合，可作线索来源，自行验证、控仓、设止损。",
           "url": "https://x.com/aleabitoreddit"
+        }
+      ]
+    },
+    {
+      "id": "freedomby40",
+      "name": "Freedom By 40",
+      "handle": "@Freedom_By_40",
+      "reddit": "",
+      "bio": "技术分析(艾略特波浪+斐波那契)·美股/加密·给明确买区与目标位",
+      "overview": "<b>技术分析派</b>：用<b>艾略特波浪 + 斐波那契回撤</b>画出明确的<b>买入区间(买区)</b>与<b>波浪目标位</b>，覆盖美股(CRCL/AMD/QUBT/BTBT)与加密(BTC/TAO)。下面每条都标了他给的「买区」当作<b>入仓参考点</b>——但这些是他个人的技术画线、非保证；务必结合本台「系统买点」、自行验证、控仓止损。(由 Zhi 提供的推文截图整理)",
+      "tickers": [
+        "CRCL",
+        "AMD",
+        "QUBT",
+        "BTBT",
+        "BTC-USD"
+      ],
+      "posts": [
+        {
+          "time": "2026-06-12",
+          "source": "X",
+          "type": "看涨/买区",
+          "rec": "明确说「def in buy area」：买区 $61.89–$82.53(现价$77.84在区内)，可能再下探$60s；目标 wave3 $280–$355、wave5 $522",
+          "zone": "买区 $61.89–82.53 · 目标 $280→$522",
+          "title": "$CRCL：没人喜欢了反而该涨——现价已在买区，$60s 可能但属可买区间",
+          "key": "艾略特数浪 wave② 见底于 0.5–0.786($61.89–$82.53)，之后 wave③→$280-355、wave⑤→$522。",
+          "bullish": [
+            "CRCL"
+          ],
+          "potential": "高 · 他的目标 wave3 $280-355 / wave5 $522(本人技术画线·非预测)",
+          "chain": [
+            "稳定币/加密金融"
+          ],
+          "detail": "原话：「$CRCL pretty well done on this guy. Now that no one likes it again it should go up soon. 60's still though probably but def in buy area imo.」——他认为现价$77.84已在买区($61.89–$82.53)，可能再砸到$60s但属可买区间；上行目标 wave3 $280–$355、wave5 $522。⚠️ 高弹性新股，目标为其本人波浪推演、未核实，看「系统买点」别追高。(推文 2026-06-12)",
+          "url": "https://x.com/Freedom_By_40"
+        },
+        {
+          "time": "2026-06-16",
+          "source": "X",
+          "type": "看涨/技术",
+          "rec": "逢低偏多：买区 $1.32–$1.59(已自1:1反弹)；但 $2.04–$2.10 是强阻力、需反复冲才能突破翻支撑",
+          "zone": "买区 $1.32–1.59 · 强阻力 $2.04–2.10",
+          "title": "$BTBT：自 1:1($1.59) 反弹是好事，但头顶 $2 一带阻力很强",
+          "key": "已在 1:1 位置($1.59)获支撑反弹；当前最大障碍是 $2.04–$2.10 的强阻力区，突破并翻为支撑后才顺。",
+          "bullish": [
+            "BTBT"
+          ],
+          "potential": "中 · 受阻于$2一带，突破后才看高",
+          "chain": [
+            "加密/矿企"
+          ],
+          "detail": "原话：「$BTBT bounced directly off the 1 to 1 which is good.. the problem is this zone we are still hitting our heads on is very strong. Simply gotta keep ramming into it until we get through the shit and flip it to support.」——买区 $1.32–$1.59，强阻力 $2.04–$2.10(现价$2.04正撞阻力)。(推文 2026-06-16)",
+          "url": "https://x.com/Freedom_By_40"
+        },
+        {
+          "time": "2026-06 近期",
+          "source": "X",
+          "type": "看涨/分析",
+          "rec": "看多但等回调：理想买区 wave iv 回踩 $244–$375(0.5–0.236)，关键支撑 $188 不可破；目标 wave V $557–$958",
+          "zone": "回调买区 $244–375(wave iv) · 守$188 · 目标 $557–958",
+          "title": "$AMD：波浪 iii 后等 iv 回调买，别丢 $188 swing low",
+          "key": "当前 wave iii(~$511)，预期回调到 wave iv($244–$375 区)是买点，关键 swing low $188 不能破；之后 wave V 冲 $557–$958。",
+          "bullish": [
+            "AMD"
+          ],
+          "potential": "高 · 目标 wave V $557–$958(本人画线)",
+          "chain": [
+            "算力/AI芯片"
+          ],
+          "detail": "原话：「Don't wanna lose this swing low imo, otherwise looks good to go higher.」——他要 $188 这个 swing low 守住；理想加仓在 wave iv 回踩 $244–$375。注意 AMD 现价已$511、属高位，他等的是回调买点而非现价追。(图为近期，无单条确切推文日期)",
+          "url": "https://x.com/Freedom_By_40"
+        },
+        {
+          "time": "2026-06 近期",
+          "source": "X",
+          "type": "看涨/分析",
+          "rec": "买区 $7.41–$9.44(wave② 回踩 0.5–0.786，现价$9.93刚在上沿)；目标 wave③ $25–$30、wave⑤ $42",
+          "zone": "买区 $7.41–9.44 · 目标 $25→$42",
+          "title": "$QUBT：wave② 回踩 $7.41–$9.44 是买区，目标 $25→$42",
+          "key": "量子计算高波动小盘；wave② 回调到 0.5–0.786($7.41–$9.44)为买区，之后 wave③→$25-30、wave⑤→$42。",
+          "bullish": [
+            "QUBT"
+          ],
+          "potential": "很高但高波动 · 目标 $25→$42(本人画线·小盘剧烈波动)",
+          "chain": [
+            "量子计算"
+          ],
+          "detail": "量子计算公司(QUBT)，极高波动小盘股。买区 $7.41–$9.44(现价$9.93在上沿附近)，上行目标 wave③ $25–$30、wave⑤ $42。⚠️ 这类票波动极大、回撤深，目标为其本人波浪推演，务必小仓+止损、看「系统买点」。(图为近期)",
+          "url": "https://x.com/Freedom_By_40"
+        },
+        {
+          "time": "周线·长线",
+          "source": "X",
+          "type": "看涨/长线",
+          "rec": "比特币长线看多：积累/买区 ~$43.5k–$63k；目标 $166k(0.786)→$227k(wave5，约2027-28)",
+          "zone": "积累区 ~$43.5k–63k · 目标 $166k→$227k",
+          "title": "$BTC 周线大浪：买区 ~$43.5k–63k，长线目标 $166k→$227k",
+          "key": "周线艾略特数浪，回调买区落在 0.5–0.618($43.5k–$51.8k)到~$63k；主升 wave5 目标 0.786 $166k、满足 $227k，时间约2027–28。",
+          "bullish": [
+            "BTC-USD"
+          ],
+          "potential": "长线高 · 目标 $166k→$227k(本人周线画线·非预测)",
+          "chain": [
+            "加密/比特币"
+          ],
+          "detail": "周线级别长线看多比特币：积累/买区约 $43.5k–$63k，主升目标 $166k(0.786)→$227k，时间框架约2027-28年。⚠️ 长周期画线、不确定性大，仅作大方向参考。(周线图，无单条确切日期)",
+          "url": "https://x.com/Freedom_By_40"
+        },
+        {
+          "time": "2026-06 近期",
+          "source": "X",
+          "type": "看涨/分析",
+          "rec": "TAO(Bittensor·加密，非美股票)买区 $159–$207、深跌区 $104–$160；预期 W-X-Y 后回升",
+          "zone": "买区 $159–207 / 深 $104–160 (加密·非美股)",
+          "title": "$TAO (Bittensor)：买区 $159–$207，深跌区 $104–$160",
+          "key": "加密币 TAO(Bittensor)，4小时图 W-X-Y 调整后看回升；买区 0.618–0.887($159–$207)，更深支撑区 $104–$160。",
+          "bullish": [],
+          "potential": "加密·高波动(非美股，本台取不到价属正常)",
+          "chain": [
+            "加密/AI代币"
+          ],
+          "detail": "TAO=Bittensor，是<b>加密货币(Bitget)、不是美股</b>，Robinhood 多数不可买、本台「系统买点」取不到价属正常。他的买区 $159–$207、深跌区 $104–$160。仅作了解。(4h图)",
+          "url": "https://x.com/Freedom_By_40"
         }
       ]
     }
