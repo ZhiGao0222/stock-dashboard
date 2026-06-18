@@ -452,7 +452,7 @@
         <label>初始资金 $ <input id="initCap" type="number" step="any" style="width:90px" placeholder="1100"/></label>
         <label>现金 $ <input id="cashIn" type="number" step="any" style="width:80px" placeholder="0"/></label>
         <label>昨日收盘·账户总值 $ <input id="prevCloseIn" type="number" step="any" style="width:100px" placeholder="如 1097"/></label>
-        <span>总盈亏 = 账户总值 − 初始资金 ｜ 今日盈亏 = 账户总值 − 昨收</span>
+        <span>总盈亏 = 账户总值 − 初始资金 ｜ 今日盈亏：当天建仓的票从成本算（昨天没持有不算昨夜跳空）；填了昨收则=账户总值−昨收</span>
       </div>
       <div class="scrolly" style="flex:1 1 auto;min-height:0">
       <div style="overflow-x:auto">
@@ -1618,6 +1618,7 @@ async function refreshPrices(){
         price, prev,
         hi:meta.fiftyTwoWeekHigh, lo:meta.fiftyTwoWeekLow,
         ma200:ma(closes,200), rsi14:rsi(closes,14),
+        lastDate:(yd.t&&yd.t.length)?_tsDate(yd.t[yd.t.length-1]):null,
         zTrig:(z&&z.trigger!=null&&!isNaN(z.trigger))?Math.round(z.trigger*100)/100:null, zSrc:z?z.srcLabel:null, zRaw:z?z.raw:null,
       };
       checkAlerts(p.ticker, price, null);   // 持仓支持价格预警(评分需个股页)
@@ -1635,8 +1636,10 @@ function renderPort(){
     const price=c.price, val=price!=null?price*p.shares:null;
     const cost=p.cost*p.shares;
     const pl=val!=null?val-cost:null, plPct=val!=null&&cost?(val-cost)/cost*100:null;
-    const dayPct=c.price!=null&&c.prev?(c.price-c.prev)/c.prev*100:null;
-    const dayPl=c.price!=null&&c.prev?(c.price-c.prev)*p.shares:null;
+    const dayPct=c.price!=null&&c.prev?(c.price-c.prev)/c.prev*100:null;   // 列:个股当日市场涨幅(从昨收)
+    const boughtToday = !p.since || (c.lastDate && p.since>=c.lastDate);    // 当天才建仓的票:昨天没持有
+    const dayBase = (boughtToday && p.cost>0) ? p.cost : c.prev;           // 今日盈亏基准:当天建仓=成本,否则=昨收
+    const dayPl=c.price!=null&&dayBase?(c.price-dayBase)*p.shares:null;
     const fromHi=c.hi&&price?(price-c.hi)/c.hi*100:null;
     const fromMa=c.ma200&&price?(price-c.ma200)/c.ma200*100:null;
     const up=p.target&&price?(p.target-price)/price*100:null;
@@ -1686,8 +1689,9 @@ function renderPort(){
   const initCap=Number(PORT.initial)||0, prevClose=Number(PORT.prevClose)||0;
   const totPl = initCap>0 ? acctVal-initCap : (totVal-totCost);
   const totPlPct = initCap>0 ? (totPl/initCap*100) : (totCost?(totVal-totCost)/totCost*100:null);
-  const todayPl = prevClose>0 ? acctVal-prevClose : totDay;
-  const todayPct = prevClose>0 ? todayPl/prevClose*100 : null;
+  const todayPl = prevClose>0 ? acctVal-prevClose : totDay;   // totDay 已按"当天建仓从成本算"(昨天没持有的不算昨夜跳空)
+  const todayBase = prevClose>0 ? prevClose : (acctVal-totDay);
+  const todayPct = todayBase>0 ? todayPl/todayBase*100 : null;
   // 最大单仓=占比最大的那一只(集中度)，并显示是哪只
   let maxW=0, maxName='';
   rows.forEach(r=>{ const w=(grand&&r.val)?r.val/grand*100:0; if(w>maxW){maxW=w; maxName=r.p.ticker;} });
@@ -1695,7 +1699,7 @@ function renderPort(){
   $('#portSummary').innerHTML=[
     sumCard('账户总值',`$${fmt(acctVal,2)}`,`股票 $${fmt(totVal,2)}${cash?` · 现金 $${fmt(cash,2)}`:''}${failedTks.length?` · <span class="neg">⚠️不含${failedTks.length}只取价失败</span>`:''}`),
     sumCard('总盈亏',`${totPl>=0?'+':''}$${fmt(totPl,2)}`,(initCap>0?`vs 初始$${fmt(initCap,0)} · `:'')+pct(totPlPct),totPl>=0?'pos':'neg'),
-    sumCard('今日盈亏',`${todayPl>=0?'+':''}$${fmt(todayPl,2)}`,prevClose>0?`vs 昨收$${fmt(prevClose,0)} · ${pct(todayPct)}`:'按昨收(填昨收账户值更准)',todayPl>=0?'pos':'neg'),
+    sumCard('今日盈亏',`${todayPl>=0?'+':''}$${fmt(todayPl,2)}`,prevClose>0?`vs 昨收$${fmt(prevClose,0)} · ${pct(todayPct)}`:`当天建仓从成本算 · ${pct(todayPct)}`,todayPl>=0?'pos':'neg'),
     sumCard('最大单仓',`${maxName?maxName+' ':''}${fmt(maxW,1)}%`,'单一最大持仓·集中度'),
     sumCard('平均 RSI',fmt(avgRsi,1),rows.length?'14日':'—'),
   ].join('');
@@ -4040,7 +4044,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260619-0130';
+const BUILD='20260619-0230';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
