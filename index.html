@@ -170,6 +170,7 @@
     <button class="tab" data-tab="stock">🔎 个股分析</button>
     <button class="tab" data-tab="chain">🔗 产业链</button>
     <button class="tab" data-tab="gurus">🧑‍💼 名人持仓</button>
+    <button class="tab" data-tab="rank">🏆 推荐排名</button>
     <button class="tab active" data-tab="market">🌐 市场动向</button>
     <button class="tab" data-tab="news">📰 全球新闻</button>
     <button class="tab" data-tab="bloggers">📡 博主追踪</button>
@@ -332,6 +333,28 @@
       <div class="small muted" style="margin-top:6px">⚠️ <b>都是延迟披露</b>：13F 季度+最多45天滞后、国会交易延迟30-45天、ARK 每日。看的是"大资金大方向押在哪"，<b>非实时买卖信号</b>；权重/交易为披露快照(注明季度+来源)，价格/评分实时。非投资建议。</div>
     </div>
     <div id="guruBody" class="panel scrolly" style="flex:1 1 auto;min-height:0"><div class="muted small" style="padding:8px">点上方任一人物。</div></div>
+  </section>
+
+  <!-- ===================== 推荐排名 ===================== -->
+  <section id="rank">
+    <div class="panel" style="flex:0 0 auto">
+      <h3 style="margin-bottom:6px">🏆 推荐排名 <span class="tag">综合本台数据给"现在适合买"的排序 + 建议买入区间</span></h3>
+      <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
+        <span class="small muted">范围</span>
+        <button class="ctrlbtn on" data-rankscope="mine">我的+名人(快)</button>
+        <button class="ctrlbtn" data-rankscope="all">全市场扫描(慢)</button>
+        <i class="ctrlsep"></i><span class="small muted">排序</span>
+        <button class="ctrlbtn on" data-ranksort="rec">推荐分</button>
+        <button class="ctrlbtn" data-ranksort="buy">买点</button>
+        <button class="ctrlbtn" data-ranksort="pot">潜力</button>
+        <i class="ctrlsep"></i>
+        <button class="ctrlbtn" data-rankgood="1">只看买点合适</button>
+        <button class="btn small" data-rankrefresh="1" style="margin-left:auto">↻ 重新扫描</button>
+        <span class="tag" id="rankCount"></span>
+      </div>
+      <div class="small muted" style="margin-top:6px">⚠️ <b>描述性排序、非涨跌预测</b>：推荐分 = 买点(便宜+在涨)×0.6 + 潜力(上行空间)×0.4。回测显示这类评分对短期≈无预测力、对长期仅弱相关——只当<b>初筛线索</b>，务必看个股详情、自己判断、控仓止损。买入区间由技术支撑(均线/20日低)推算、非保证。</div>
+    </div>
+    <div id="rankList" class="panel scrolly" style="flex:1 1 auto;min-height:0"><div class="muted small" style="padding:8px">切到本页或点"重新扫描"生成排名。</div></div>
   </section>
 
   <!-- ===================== NEWS ===================== -->
@@ -3086,6 +3109,78 @@ document.addEventListener('click',e=>{
   const gb=e.target.closest('#guruNav [data-guru]'); if(gb){ showGuru(gb.dataset.guru); return; }
   const gt=e.target.closest('#guruBody [data-gurutk]'); if(gt){ e.preventDefault(); const tk=gt.dataset.gurutk; $('#stkInput').value=tk; openTab('stock'); analyzeStock(tk); return; }
 });
+/* =================================================================
+   🏆 推荐排名：扫描系统已知的票，按"现在适合买"(买点×0.6 + 潜力×0.4)排序，给建议买入区间。
+   描述性初筛，非涨跌预测(回测：短期≈无预测力)。
+   ================================================================= */
+let rankScope='mine', rankSort='rec', rankOnlyGood=false, _rankOk=[];
+function rankUniverse(scope){
+  const set=new Set();
+  WATCH.forEach(w=>set.add(w.ticker));
+  (PORT.positions||[]).forEach(p=>set.add(p.ticker));
+  if(typeof GURUS!=='undefined') GURUS.forEach(g=>g.h.forEach(x=>{ if(!x[3]) set.add(x[0]); }));
+  if(scope==='all'){ for(const k in THEMES){ const t=THEMES[k]; if(t.tickers) t.tickers.forEach(tk=>set.add(tk)); } }
+  return [...new Set([...set].filter(Boolean).map(normTk))];
+}
+/* 建议买入区间：用技术支撑(均线/20日低)推算，非价格预测 */
+function buyZone(m){
+  const {price,ma10,ma50,ma200,lo20}=m, b=buyPointOf(m);
+  const sups=[ma10,ma50,ma200,lo20].filter(v=>v!=null&&v<price).sort((x,y)=>y-x);
+  const near=sups[0]||lo20||price*0.95;
+  const stop=(lo20!=null?lo20:(ma50?ma50*0.97:price*0.92))*0.985;
+  let zone;
+  if(b.lvl==='合适') zone=`现价 $${fmt(price,2)} 可分批；回踩 $${fmt(near,2)} 加`;
+  else if(b.lvl==='一般') zone=`等回踩 $${fmt(near,2)} 附近再分批更稳`;
+  else zone=`暂不追，观望；深跌破 $${fmt(near,2)} 再评估`;
+  return {zone,stop};
+}
+async function loadRank(){
+  const list=document.getElementById('rankList'); if(!list)return;
+  const uni=rankUniverse(rankScope);
+  list.innerHTML=`<div class="muted small" style="padding:8px">正在评估 ${uni.length} 只股票的买点/潜力…(${rankScope==='all'?'全市场较慢，约30秒':'约10–20秒'})</div>`;
+  const rows=await mapLimit(uni, 10, async tk=>{
+    try{ const d=await yahoo(tk,'1y','1d'); if(!d.closes||d.closes.length<40)return null;
+      const m=computeStock(d.meta,d.closes,null,d.v);
+      const prev=d.closes.length>=2?d.closes[d.closes.length-2]:null;
+      const pot=potentialOf(m), bp=buyPointOf(m);
+      const potScore=lin(pot.up==null?0:pot.up,-10,45);
+      const rec=Math.round(0.6*m.Timing + 0.4*potScore);
+      const name=d.meta.shortName||d.meta.longName||'';
+      return {tk, m, dayPct:prev?(m.price-prev)/prev*100:null, pot, bp, rec, name};
+    }catch(e){ return null; }
+  });
+  _rankOk=rows.filter(Boolean);
+  renderRankList();
+}
+function renderRankList(){
+  const list=document.getElementById('rankList'); if(!list)return;
+  let rows=_rankOk.slice();
+  if(rankOnlyGood) rows=rows.filter(r=>r.bp.lvl==='合适');
+  if(rankSort==='pot') rows.sort((a,b)=>(b.pot.up==null?-1e9:b.pot.up)-(a.pot.up==null?-1e9:a.pot.up));
+  else if(rankSort==='buy') rows.sort((a,b)=>b.m.Timing-a.m.Timing);
+  else rows.sort((a,b)=>(b.rec-a.rec)||(b.m.Final-a.m.Final));
+  const cnt=document.getElementById('rankCount'); if(cnt)cnt.textContent=`${rows.length} 只 · ${new Date().toLocaleTimeString('zh-CN')}`;
+  if(!rows.length){ list.innerHTML='<div class="muted small" style="padding:8px">没有符合条件的(试试取消"只看买点合适"或重新扫描)。</div>'; return; }
+  list.innerHTML=rows.slice(0,60).map((r,i)=>{
+    const m=r.m, color=m.Final>=60?'#3fb950':(m.Final>=45?'#d29922':'#6e7681');
+    const rc=r.rec>=60?'#3fb950':(r.rec>=45?'#d29922':'#6e7681');
+    const z=buyZone(m);
+    const why=(m.Value>=55&&m.Trend>=52)?'估值偏低 + 动量转强':(m.Trend>=58?'趋势在涨(动量强)':(m.Value>=58?'估值便宜(左侧)':(m.Timing>=52?'买点尚可':'信号一般')));
+    return `<div class="panel sig" style="margin-bottom:6px">
+      <div class="top"><span class="name">#${i+1} <a href="#" data-ranktk="${r.tk}" style="color:var(--text)">${r.tk}</a> <span class="muted small" style="font-weight:400">${r.name?r.name+' · ':''}$${fmt(m.price,2)} <span class="${cls(r.dayPct)}">${pct(r.dayPct)}</span></span></span>
+        <span>推荐 <b style="color:${rc}">${r.rec}</b> <span class="muted small">· 综合 ${m.Final}</span></span></div>
+      <div class="small">买点 <b style="color:${r.bp.color}">${r.bp.lvl}</b> · 潜力 <b style="color:${r.pot.color}">${r.pot.lvl}${r.pot.up!=null?`(${r.pot.up>=0?'+':''}${fmt(r.pot.up,0)}%)`:''}</b> <span class="muted">· ${why}</span></div>
+      <div class="small" style="color:var(--accent)">💵 ${z.zone} <span class="muted">· 参考止损 $${fmt(z.stop,2)}</span></div>
+      <div class="gauge" style="height:4px;margin-top:4px"><i style="width:${r.rec}%;background:${rc}"></i></div></div>`;
+  }).join('');
+}
+document.addEventListener('click',e=>{
+  const sc=e.target.closest('[data-rankscope]'); if(sc){ rankScope=sc.dataset.rankscope; document.querySelectorAll('[data-rankscope]').forEach(b=>b.classList.toggle('on',b===sc)); loadRank(); return; }
+  const so=e.target.closest('[data-ranksort]'); if(so){ rankSort=so.dataset.ranksort; document.querySelectorAll('[data-ranksort]').forEach(b=>b.classList.toggle('on',b===so)); renderRankList(); return; }
+  const gd=e.target.closest('[data-rankgood]'); if(gd){ rankOnlyGood=!rankOnlyGood; gd.classList.toggle('on',rankOnlyGood); renderRankList(); return; }
+  const rf=e.target.closest('[data-rankrefresh]'); if(rf){ loadRank(); return; }
+  const rt=e.target.closest('#rankList [data-ranktk]'); if(rt){ e.preventDefault(); const tk=rt.dataset.ranktk; $('#stkInput').value=tk; openTab('stock'); analyzeStock(tk); return; }
+});
 function refreshTab(tab, force){
   if(!tab)return;
   const now=Date.now();
@@ -3098,6 +3193,7 @@ function refreshTab(tab, force){
   else if(tab==='stock'){ showTheme(curTheme); if(CHARTS.stkChart)refreshChart('stkChart'); }   // 右栏主题/关注随标签刷新
   else if(tab==='chain'){ renderChainNav(); showChainSegment(curChain||CHAINS[0].id); }
   else if(tab==='gurus'){ renderGuruNav(); showGuru(curGuru||GURUS[0].id); }
+  else if(tab==='rank'){ if(_rankOk.length) renderRankList(); else loadRank(); }
   else if(tab==='myk') renderMyKlines();
   else if(tab==='bloggers') loadBloggers();
 }
