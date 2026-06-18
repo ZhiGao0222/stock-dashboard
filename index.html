@@ -164,7 +164,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><span class="logo">📈</span>美股参考台<span class="clock" id="clock"></span></div>
+  <div class="brand"><span class="logo">📈</span>美股参考台<span class="clock" id="clock"></span><span class="clock" id="buildTag" style="opacity:.6"></span></div>
   <nav class="tabs" id="tabs">
     <button class="tab" data-tab="dash">📊 市场监控</button>
     <button class="tab" data-tab="stock">🔎 个股分析</button>
@@ -3330,7 +3330,11 @@ function renderSizer(){
     </div>
     <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
       <span class="small muted">桶内权重</span>${mb('invvol','反波动率·控风险(推荐)')}${mb('score','评分加权·偏强势')}${mb('equal','等权')}
-      <i class="ctrlsep"></i><span class="small muted">总资金$(选填)</span><input id="sz_cap" type="number" value="${SIZER.cap||''}" placeholder="如 1100" style="width:100px">
+      <i class="ctrlsep"></i><span class="small muted">单仓上限%</span><input id="sz_max" type="number" value="${SIZER.maxw||''}" placeholder="如25" style="width:56px">
+      <span class="small muted">总资金$</span><input id="sz_cap" type="number" value="${SIZER.cap||''}" placeholder="选填1100" style="width:90px">
+    </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">
+      <button class="btn small" data-sizerfill="1">📥 填入我的关注(自动分桶)</button>
       <button class="btn primary small" data-sizergo="1" style="margin-left:auto">🧮 计算配比</button>
     </div></div>
     <div id="sizerResult"><div class="muted small" style="padding:6px">填好三个桶 → 点「计算配比」。</div></div>`;
@@ -3338,7 +3342,7 @@ function renderSizer(){
 }
 async function computeSizer(){
   const g=id=>(document.getElementById(id)||{}).value||'';
-  SIZER.safe=g('sz_safe'); SIZER.etf=g('sz_etf'); SIZER.growth=g('sz_growth'); SIZER.cap=g('sz_cap'); save('sizer',SIZER);
+  SIZER.safe=g('sz_safe'); SIZER.etf=g('sz_etf'); SIZER.growth=g('sz_growth'); SIZER.cap=g('sz_cap'); SIZER.maxw=g('sz_max'); save('sizer',SIZER);
   const out=document.getElementById('sizerResult'); if(!out)return;
   const T=STRAT_BUCKETS[stratStyle], meth=SIZER.method||'invvol', cap=parseFloat(SIZER.cap)||0;
   const parse=s=>[...new Set((s||'').toUpperCase().split(/[^A-Z0-9.\-]+/).filter(Boolean).map(normTk))];
@@ -3353,6 +3357,10 @@ async function computeSizer(){
     const wOf=t=>{ const d=data[t]; return meth==='equal'?1:(meth==='score'?Math.max(1,d.fin):1/Math.max(0.08,d.vol)); };
     const ws=ok.map(wOf), sum=ws.reduce((a,x)=>a+x,0)||1;
     ok.forEach((t,i)=>rows.push({tk:t,bucket:b.lab,pct:b.adj*ws[i]/sum,...data[t]})); });
+  const capPct=parseFloat(SIZER.maxw)||0;   // 单仓上限：超过则削到上限、多出的按比例分给未封顶的
+  if(capPct>0 && rows.length){ for(let it=0;it<8;it++){ const over=rows.filter(r=>r.pct>capPct+0.05&&!r._cap); if(!over.length)break;
+    let ex=0; over.forEach(r=>{ ex+=r.pct-capPct; r.pct=capPct; r._cap=true; });
+    const un=rows.filter(r=>!r._cap), us=un.reduce((a,r)=>a+r.pct,0); if(us<=0)break; un.forEach(r=>r.pct+=ex*r.pct/us); } }
   rows.sort((a,b)=>b.pct-a.pct);
   const wVol=rows.reduce((a,r)=>a+r.pct/100*r.vol,0), lev=rows.filter(r=>LEV_ETF.includes(r.tk)).reduce((a,r)=>a+r.pct,0), maxR=rows[0];
   const col=`1fr 60px 66px 56px${cap?' 92px':''}`;
@@ -3370,9 +3378,20 @@ async function computeSizer(){
     ${failed.length?`<div class="small" style="color:var(--amber);margin-top:4px">取数失败(非美股/代码错)：${failed.join('、')} —— 未计入</div>`:''}
     <div class="small muted" style="margin-top:4px">桶内默认<b>反波动率</b>(波动越低权重越高、控风险)，可切评分加权/等权；空桶比例已按比例分给有票的桶。<b>透明算法·参考·非投资建议</b>，自行判断、控仓止损。</div></div>`;
 }
+/* 一键把「观察中+重点关注」按波动率自动分到三个桶 */
+async function sizerPrefill(){
+  const tks=[...new Set(WATCH.map(w=>normTk(w.ticker)))];
+  if(!tks.length){ alert('你的「观察中/重点关注」是空的——先去个股分析加几只。'); return; }
+  const out=document.getElementById('sizerResult'); if(out)out.innerHTML='<div class="muted small" style="padding:6px">读取你的关注、按波动率自动分桶中…</div>';
+  const bk={safe:[],etf:[],growth:[]};
+  await Promise.all(tks.map(async tk=>{ try{ if(isETF(tk)){bk.etf.push(tk);return;} const d=await yahoo(tk,'1y','1d'); const m=(d.closes&&d.closes.length>=40)?computeStock(d.meta,d.closes,null,d.v):null; bk[m?bucketOf(tk,m.vol):'growth'].push(tk); }catch(e){ bk.growth.push(tk); } }));
+  SIZER.safe=bk.safe.join(' '); SIZER.etf=bk.etf.join(' '); SIZER.growth=bk.growth.join(' '); save('sizer',SIZER);
+  renderSizer();   // 重渲染表单(已填好) + 自动计算
+}
 document.addEventListener('click',e=>{
   const sm=e.target.closest('[data-stratmode]'); if(sm){ stratMode=sm.dataset.stratmode; document.querySelectorAll('[data-stratmode]').forEach(b=>b.classList.toggle('on',b===sm)); loadStrategy(); return; }
   const sme=e.target.closest('[data-sizermethod]'); if(sme){ SIZER.method=sme.dataset.sizermethod; save('sizer',SIZER); document.querySelectorAll('[data-sizermethod]').forEach(b=>b.classList.toggle('on',b===sme)); computeSizer(); return; }
+  const sf=e.target.closest('[data-sizerfill]'); if(sf){ sizerPrefill(); return; }
   const sg=e.target.closest('[data-sizergo]'); if(sg){ computeSizer(); return; }
   const sk=e.target.closest('#strategy [data-stk]'); if(sk){ e.preventDefault(); $('#stkInput').value=sk.dataset.stk; openTab('stock'); analyzeStock(sk.dataset.stk); return; }
   const ss=e.target.closest('[data-stratstyle]'); if(ss){ stratStyle=ss.dataset.stratstyle; document.querySelectorAll('[data-stratstyle]').forEach(b=>b.classList.toggle('on',b===ss)); loadStrategy(); return; }
@@ -3521,6 +3540,21 @@ function boot(){
   setTimeout(checkDataHealth, 9000); // 9秒后若仍没拿到实时数据→弹出修复指引
   setInterval(checkDataHealth, 8000);
   setTimeout(pollAlerts, 12000);     // 启动后跑一次预警检查
+  if($('#buildTag'))$('#buildTag').textContent='build '+BUILD;
+  setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
+}
+/* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
+const BUILD='20260617-2050';
+async function checkBuild(){
+  try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
+    const m=t.match(/const BUILD='([0-9-]+)'/);
+    if(m && m[1]>BUILD && !document.getElementById('updBar')){
+      const b=document.createElement('div'); b.id='updBar';
+      b.style.cssText='position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;background:var(--accent);color:#fff;padding:9px 16px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.45);cursor:pointer;font-size:13px;font-weight:700';
+      b.textContent='🔄 有新版本 '+m[1]+'，点此刷新加载最新';
+      b.onclick=()=>location.reload(true);
+      document.body.appendChild(b);
+    } }catch(e){}
 }
 boot();
 </script>
