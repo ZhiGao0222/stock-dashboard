@@ -473,7 +473,7 @@
       <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
         <div class="row" style="align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
           <h3 style="margin:0">📅 每日盈亏日历</h3>
-          <span class="muted small">按当前持仓算·每日组合涨跌%（绿涨/红跌·颜色深浅=幅度）</span>
+          <span class="muted small">只按你真实持仓·从买入日起记（之前不持有=空白）</span>
           <span class="spacer"></span>
           <button class="btn small" id="pnlPrev" style="padding:2px 11px">‹</button>
           <span id="pnlMonth" style="min-width:84px;text-align:center;font-weight:600"></span>
@@ -481,7 +481,7 @@
           <span class="tag" id="pnlSummary" style="margin-left:8px"></span>
         </div>
         <div id="pnlCal"><div class="muted small">打开/刷新持仓后自动生成…</div></div>
-        <div class="small muted" style="margin-top:8px">说明：用你当前持仓的股数 × 各股历史每日收盘价，重算"按现在这个组合"每天会涨跌多少（不是逐日真实账户快照，因为没有买卖流水）。当月汇总=各交易日复利。</div>
+        <div class="small muted" style="margin-top:8px">说明：<b>只从你的买入/记录日开始记</b>——买入<b>之前不持有</b>所以空白；<b>买入当天</b>=成本价→当天收盘的涨跌；<b>之后每天</b>=昨收→今收。每过一个交易日自动补一格。想补看更早的真实走势：在持仓那行点 <b>✎</b> 填上真实「买入日期」即可回填。当月汇总=各持有交易日复利。</div>
       </div>
       </div>
     </div>
@@ -613,6 +613,7 @@
     <label class="fld">股数 Shares <input id="p_shares" type="number" step="any"></label>
     <label class="fld">平均成本 Avg Cost <input id="p_cost" type="number" step="any"></label>
     <label class="fld">目标价 Target (可选) <input id="p_target" type="number" step="any"></label>
+    <label class="fld">买入/记录日期 (可选·留空=今天) <input id="p_since" type="date"></label>
     <label class="fld" style="grid-column:1/3">备注 Note (可选) <input id="p_note"></label>
   </div>
   <div class="row" style="margin-top:16px;justify-content:flex-end">
@@ -1531,20 +1532,38 @@ function timeAgo(d){
    PORTFOLIO
    ================================================================= */
 let priceCache={}; // ticker -> {price,prev,hi,lo,ma200,rsi14}
-/* 📅 每日盈亏日历：用当前持仓×各票历史日收盘，重算"按当前组合"的每日涨跌%(绿涨红跌·深浅=幅度)。
-   数据来自 refreshPrices 已抓的日线(零额外请求)；非逐日真实账户快照(无成交流水)，是当前篮子的每日回报。 */
+/* 📅 每日盈亏日历：只按你真实持仓算。买入/记录日之前=不持有(空白·0)；买入当天=成本价→收盘的涨跌；
+   之后每天=昨收→今收。多只票按当天市值加权成组合每日%。数据来自 refreshPrices 已抓的日线(零额外请求)。 */
 let _pnlData=null, _pnlMonthOff=0;
 function _tsDate(ts){ const d=new Date(ts*1000); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); }
-function buildPnlData(series){
+function buildPnlData(series){   // series: [{p, sh, t, c}]  p=持仓对象(取 cost/since)
   if(!series||!series.length){ _pnlData={}; return; }
-  const maps=series.map(s=>{ const m={}; for(let i=0;i<s.t.length;i++){ if(s.c[i]!=null) m[_tsDate(s.t[i])]=s.c[i]; } return {sh:s.sh, m}; });
-  const allDates=[...new Set(maps.flatMap(x=>Object.keys(x.m)))].sort();
-  const last=maps.map(()=>null), portVal={};
-  for(const ds of allDates){ let v=0, any=false;
-    maps.forEach((x,i)=>{ if(x.m[ds]!=null) last[i]=x.m[ds]; if(last[i]!=null){ v+=last[i]*x.sh; any=true; } });
-    if(any) portVal[ds]=v; }
-  const dates=Object.keys(portVal).sort(), pnl={};
-  for(let i=1;i<dates.length;i++){ const pv=portVal[dates[i-1]], cv=portVal[dates[i]]; if(pv>0) pnl[dates[i]]={pct:(cv-pv)/pv*100, usd:cv-pv}; }
+  const items=series.map(s=>{ const m={}; for(let i=0;i<s.t.length;i++){ if(s.c[i]!=null) m[_tsDate(s.t[i])]=s.c[i]; } return {p:s.p, sh:s.sh, cost:s.p.cost||0, m}; });
+  const allDates=[...new Set(items.flatMap(it=>Object.keys(it.m)))].sort();
+  if(!allDates.length){ _pnlData={}; return; }
+  const latest=allDates[allDates.length-1];
+  let changed=false;
+  items.forEach(it=>{
+    it.fc=[]; let last=null; for(const ds of allDates){ if(it.m[ds]!=null) last=it.m[ds]; it.fc.push(last); }   // 前向填充
+    if(!it.p.since){ it.p.since=latest; changed=true; }                 // 首次=锚定到最近交易日(=今天)，之后持久
+    const since=(it.p.since>latest)?latest:it.p.since;
+    let bi=allDates.findIndex(d=>d>=since); if(bi<0) bi=allDates.length-1;
+    it.buyIdx=bi;                                                       // 买入日索引(第一个>=since 的交易日)
+  });
+  if(changed) savePort();
+  const pnl={};
+  for(let di=0; di<allDates.length; di++){
+    const ds=allDates[di]; let base=0, val=0, any=false;
+    items.forEach(it=>{
+      if(di<it.buyIdx) return;                                         // 还没买入→不计
+      const c=it.fc[di]; if(c==null) return;
+      let b;
+      if(di===it.buyIdx){ b=(it.cost>0)? it.sh*it.cost : it.sh*c; }     // 买入当天：成本→收盘(成本缺省则当天0%)
+      else { const pc=it.fc[di-1]; if(pc==null) return; b=it.sh*pc; }   // 之后：昨收→今收
+      val+=it.sh*c; base+=b; any=true;
+    });
+    if(any && base>0) pnl[ds]={pct:(val-base)/base*100, usd:val-base};
+  }
   _pnlData=pnl;
 }
 function renderPnlCalendar(){
@@ -1576,7 +1595,7 @@ function renderPnlCalendar(){
   box.innerHTML=html;
   if(mData.length){ const comp=(mData.reduce((a,p)=>a*(1+p/100),1)-1)*100, best=Math.max(...mData), worst=Math.min(...mData);
     $('#pnlSummary').innerHTML=`当月 <b style="color:${comp>=0?'#3fb950':'#f85149'}">${comp>=0?'+':''}${fmt(comp,1)}%</b> · 最佳 <span style="color:#3fb950">+${fmt(best,1)}%</span> · 最差 <span style="color:#f85149">${fmt(worst,1)}%</span>`;
-  } else $('#pnlSummary').textContent='本月暂无交易日数据';
+  } else $('#pnlSummary').textContent='本月暂无持有记录';
 }
 { const a=$('#pnlPrev'), b=$('#pnlNext');
   if(a)a.onclick=()=>{ _pnlMonthOff=Math.max(-11,_pnlMonthOff-1); renderPnlCalendar(); };
@@ -1590,7 +1609,7 @@ async function refreshPrices(){
     try{
       const [yd, lp]=await Promise.all([yahoo(p.ticker,'1y','1d'), livePrice(p.ticker)]);
       const {meta,closes}=yd;
-      if(yd.t&&yd.c&&yd.c.length) _pnlSeries.push({sh:p.shares, t:yd.t, c:yd.c});
+      if(yd.t&&yd.c&&yd.c.length) _pnlSeries.push({p, sh:p.shares, t:yd.t, c:yd.c});
       // 真正的"昨收"=倒数第二根日K（meta.chartPreviousClose 是一年前的收盘，不能用）
       const prev = closes.length>=2 ? closes[closes.length-2] : meta.chartPreviousClose;
       const price = lp ?? meta.regularMarketPrice;   // 优先含盘后实时价
@@ -1694,13 +1713,15 @@ function openPos(idx){
   $('#posDlgTitle').textContent = idx!=null?'编辑持仓':'添加持仓';
   $('#p_ticker').value=p.ticker||''; $('#p_shares').value=p.shares??'';
   $('#p_cost').value=p.cost??''; $('#p_target').value=p.target??''; $('#p_note').value=p.note||'';
+  $('#p_since').value=p.since||'';
   $('#posDlg').showModal();
 }
 $('#savePos').onclick=()=>{
   const t=$('#p_ticker').value.trim().toUpperCase();
   if(!t){alert('请填代码');return;}
   const pos={ticker:t,shares:parseFloat($('#p_shares').value)||0,cost:parseFloat($('#p_cost').value)||0,
-    target:parseFloat($('#p_target').value)||null,note:$('#p_note').value.trim()};
+    target:parseFloat($('#p_target').value)||null,note:$('#p_note').value.trim(),
+    since:$('#p_since').value||undefined};   // 买入/记录日期；留空=买入当天自动锚到今天
   if(editIdx!=null)PORT.positions[editIdx]=pos; else PORT.positions.push(pos);
   savePort(); $('#posDlg').close(); refreshPrices();
 };
@@ -4019,7 +4040,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260619-0030';
+const BUILD='20260619-0130';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
