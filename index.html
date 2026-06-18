@@ -3004,6 +3004,36 @@ async function _fillBlogVerdicts(){
     document.querySelectorAll('#blogFeed .blog-verdict[data-vtk="'+tk+'"]').forEach(s=>s.innerHTML='<b>'+tk+'</b> '+html);
   }));
 }
+/* 自动观点汇总：随帖子变化自动重算(持仓/点名频次/主题分布/类型分布) */
+function _blogSummary(b){
+  const posts=b.posts||[]; if(!posts.length) return '';
+  const freq={}; posts.forEach(p=>(p.bullish||[]).forEach(t=>freq[t]=(freq[t]||0)+1));
+  const topTk=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const tc={看涨:0,复盘:0,方法论:0,分析:0};
+  posts.forEach(p=>{const t=p.type||''; if(/看涨|买入|目标价|评级/.test(t))tc.看涨++; else if(/复盘|招牌/.test(t))tc.复盘++; else if(/方法论/.test(t))tc.方法论++; else tc.分析++;});
+  const ch={}; posts.forEach(p=>(p.chain||[]).forEach(c=>ch[c]=(ch[c]||0)+1));
+  const topCh=Object.entries(ch).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  const hold=(b.holdings||[]).map(h=>`<span class="pill ${/非美/.test(h)?'':'buy'}">${h}</span>`).join(' ');
+  return `<div class="panel" style="margin-bottom:8px;border-color:var(--accent)">
+    <div style="font-weight:700">📊 整体观点汇总 <span class="muted small" style="font-weight:400">共 ${posts.length} 条 · 加新观点会自动更新</span></div>
+    ${hold?`<div class="small" style="margin-top:5px">💼 <b>自述持仓</b> ${hold}</div>`:''}
+    <div class="small" style="margin-top:5px">🔥 <b>点名最多(看好)</b> ${topTk.map(([t,n])=>`<a href="#" data-stk="${t}" class="pill buy">${t}${n>1?'×'+n:''}</a>`).join(' ')||'—'}</div>
+    <div class="small" style="margin-top:5px">🧭 <b>主题分布</b> ${topCh.map(([c,n])=>`<span class="pill">${c}·${n}</span>`).join(' ')}</div>
+    <div class="small muted" style="margin-top:5px">📈 看涨/买入 ${tc.看涨} · 复盘/招牌 ${tc.复盘} · 分析/科普 ${tc.分析} · 方法论 ${tc.方法论}</div></div>`;
+}
+/* 「他点名的美股·实时评分」清单：去重所有看好的美股票，配本台实时买点+他给的买区 */
+function _blogPickList(b){
+  const posts=b.posts||[]; const freq={}, zone={};
+  posts.forEach(p=>(p.bullish||[]).forEach(t=>{ freq[t]=(freq[t]||0)+1; if(p.zone&&!zone[t])zone[t]=p.zone; }));
+  const list=Object.keys(freq).sort((a,b)=>freq[b]-freq[a]); if(!list.length) return '';
+  const rows=list.map(t=>`<div class="small" style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--border)">
+    <a href="#" data-stk="${t}" style="min-width:60px;font-weight:700;color:var(--text)">${t}</a>
+    <span class="muted">点名×${freq[t]}</span>${zone[t]?` <span style="color:var(--accent)">${zone[t]}</span>`:''}
+    <span class="blog-verdict" data-vtk="${t}" style="margin-left:auto">核对中…</span></div>`).join('');
+  return `<div class="panel" style="margin-bottom:8px"><div style="font-weight:700">📋 他点名的美股 · 实时评分 <span class="muted small" style="font-weight:400">每只=本台实时买点/潜力，点代码看详情</span></div>
+    <div style="margin-top:6px">${rows}</div>
+    <div class="small muted" style="margin-top:5px">仅列美股可买的；非美股(如 SIVE/IQE/XFAB/LPK)见各帖说明。这是<b>他看好的票、非本台推荐</b>，务必看「系统买点」自行判断。</div></div>`;
+}
 function renderBloggerFeed(b){
   const feed=$('#blogFeed'); if(!feed||!b)return;
   const ov=(b.overview?`<b>💡 本轮要点</b> ${b.overview}`:'')+((b.tickers&&b.tickers.length)?`<div style="margin-top:6px"><span class="muted">提到的票：</span>${b.tickers.map(t=>`<a href="#" data-stk="${t}" class="pill buy" style="margin:0 4px 4px 0;display:inline-block">${t}</a>`).join('')}</div>`:'');
@@ -3026,7 +3056,7 @@ function renderBloggerFeed(b){
       ${more}
     </div>`;
   }).join('');
-  feed.innerHTML = head + sortBar + (posts || '<div class="muted small" style="padding:8px">该博主暂无采集到的观点。</div>');
+  feed.innerHTML = head + _blogSummary(b) + _blogPickList(b) + sortBar + (posts || '<div class="muted small" style="padding:8px">该博主暂无采集到的观点。</div>');
   _fillBlogVerdicts();
 }
 document.addEventListener('click',e=>{
