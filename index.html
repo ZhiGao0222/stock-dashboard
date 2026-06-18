@@ -469,6 +469,15 @@
     给任意股票设阈值，满足时<b>浏览器通知 + 页面提示</b>。后台按刷新频率自动检查（需保持本页打开、并允许通知）。
     条件清除后会自动复位，下次再触发会再次提醒。
   </p>
+  <div style="border:1px solid var(--accent);border-radius:8px;padding:10px;margin:0 0 14px;background:rgba(88,166,255,.06)">
+    <div style="font-weight:600">🎯 重点关注 · 一键挂「买区/限制区」提醒</div>
+    <div class="small muted" style="margin:4px 0 8px;line-height:1.5">
+      给你所有【🎯重点关注】的股票自动挂提醒：当价格<b>回落进入买入区间（限制区）</b>时通知你。
+      买区<b>优先</b>用博主 <b>Freedom By 40</b> 等已给出的买区间估算，没有的用系统技术支撑位兜底。<b>数据真实·非投资建议。</b>
+    </div>
+    <button class="btn primary" id="al_armFocus">🎯 一键给【重点关注】挂买区提醒</button>
+    <div id="al_armResult" class="small" style="margin-top:8px"></div>
+  </div>
   <div class="form-grid" style="grid-template-columns:1.1fr 1fr 1fr .8fr;align-items:end;gap:8px">
     <label class="fld">代码 <input id="al_tk" placeholder="AAPL" style="text-transform:uppercase"></label>
     <label class="fld">条件 <select id="al_type"><option value="price">价格 $</option><option value="score">综合评分</option></select></label>
@@ -2763,8 +2772,10 @@ function renderAlertList(){
   const rows=alertRules(), box=$('#al_list'); if(!box)return;
   box.innerHTML = rows.length ? rows.map(({tk,i,r})=>{
     const what=r.type==='price'?'价格':'评分', dir=r.dir==='above'?'≥':'≤', d=r.type==='price'?2:0;
-    return `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--border);padding:6px 0">
-      <span><b>${tk}</b> · ${what} ${dir} ${fmt(r.value,d)} ${r.fired?'<span class="pill sell">已触发</span>':'<span class="pill buy">监控中</span>'}</span>
+    const ztag = r.src==='zone' ? ' <span class="pill" style="background:var(--accent);color:#fff">买区</span>' : '';
+    const note = r.note ? `<div class="small muted" style="margin-top:2px">${r.note}</div>` : '';
+    return `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--border);padding:6px 0;align-items:flex-start">
+      <span><b>${tk}</b> · ${what} ${dir} ${fmt(r.value,d)}${ztag} ${r.fired?'<span class="pill sell">已触发</span>':'<span class="pill buy">监控中</span>'}${note}</span>
       <button class="iconbtn" data-aldel="${tk}:${i}" title="删除">🗑</button></div>`;
   }).join('') : '<div class="muted small">还没有预警。上面填代码 + 条件 + 数值，点"添加预警"。</div>';
 }
@@ -2784,6 +2795,81 @@ $('#alertsBtn').onclick=()=>{ $('#al_tk').value=''; $('#al_val').value=''; rende
 $('#al_add').onclick=()=>{ if(addAlert($('#al_tk').value,$('#al_type').value,$('#al_dir').value,$('#al_val').value)){ $('#al_val').value=''; } else alert('请填写有效的代码和数值。'); };
 $('#al_close').onclick=()=>$('#alertDlg').close();
 $('#al_list').addEventListener('click',e=>{ const k=e.target.dataset.aldel; if(k){ const idx=k.lastIndexOf(':'); removeAlert(k.slice(0,idx), +k.slice(idx+1)); } });
+
+/* =================================================================
+   🎯 重点关注 · 买区(限制区)提醒：一键给所有【重点关注】挂"价格回落进买区"提醒。
+   买区优先取博主(如 Freedom By 40)已给的买区间，没有则用系统技术支撑位 buyZone 兜底。
+   触发=价格 ≤ 买区上沿(即已回落进入买区)，复用现成 ALERTS/checkAlerts/pollAlerts 后台轮询。
+   ================================================================= */
+function parseZoneRange(s){            // 从博主买区文本提取第一个 $X–Y 价格区间(支持 – — - 与 k 后缀)
+  if(!s)return null;
+  const m=String(s).match(/\$?\s*([\d,]+(?:\.\d+)?)\s*([kK])?\s*[–—\-]\s*\$?\s*([\d,]+(?:\.\d+)?)\s*([kK])?/);
+  if(!m)return null;
+  const num=(v,k)=>parseFloat(String(v).replace(/,/g,''))*(k?1000:1);
+  let lo=num(m[1],m[2]), hi=num(m[3],m[4]);
+  if(isNaN(lo)||isNaN(hi))return null;
+  if(lo>hi){const t=lo;lo=hi;hi=t;}
+  return {lo,hi};
+}
+function bloggerZoneRange(tk){         // 找某票第一个可解析买区(看涨帖的 zone)；FB40 这类给买区间的会命中
+  if(!_blogData||!Array.isArray(_blogData.bloggers))return null;
+  for(const b of _blogData.bloggers){
+    for(const p of (b.posts||[])){
+      if(Array.isArray(p.bullish)&&p.bullish.includes(tk)&&p.zone){
+        const r=parseZoneRange(p.zone);
+        if(r)return {lo:r.lo, hi:r.hi, by:b.name, raw:p.zone};
+      }
+    }
+  }
+  return null;
+}
+async function armFocusZoneAlerts(){
+  if(!_blogData){ try{ const r=await fetch('bloggers.json?cb='+Date.now(),{cache:'no-store'}); _blogData=r.ok?await r.json():null; }catch(e){} }
+  const focus=WATCH.filter(w=>tierOf(w)==='focus');
+  const out=$('#al_armResult');
+  if(!focus.length){ if(out)out.innerHTML='<span style="color:var(--amber)">你的【🎯重点关注】是空的。先到「个股分析」把要盯的股票点成 🎯 重点，再回来挂提醒。</span>'; return; }
+  const btn=$('#al_armFocus'); if(btn){ btn.disabled=true; btn.textContent='正在计算买区…'; }
+  if(out)out.innerHTML='<span class="muted">正在为 '+focus.length+' 只重点关注计算买区…</span>';
+  const r2=v=>Math.round(v*100)/100;
+  const done=[], failed=[];
+  for(const w of focus){
+    const tk=w.ticker;
+    try{
+      const d=await yahoo(tk,'1y','1d');
+      if(!d.closes||d.closes.length<20){ failed.push(tk+'·数据不足'); continue; }
+      const m=computeStock(d.meta,d.closes,null,d.v);
+      const bz=bloggerZoneRange(tk);
+      let trigger, srcLabel, note;
+      if(bz){ trigger=bz.hi; srcLabel=bz.by; note='来源：'+bz.by+' · '+bz.raw; }
+      else { const z=buyZone(m); trigger=z.near; srcLabel='系统技术位'; note='来源：系统技术支撑位 $'+fmt(z.near,2)+'（'+z.zone+'）'; }
+      if(trigger==null||isNaN(trigger)){ failed.push(tk+'·无买区'); continue; }
+      trigger=r2(trigger);
+      ALERTS[tk]=ALERTS[tk]||[];
+      const ex=ALERTS[tk].find(x=>x.type==='price'&&x.dir==='below'&&x.src==='zone');
+      if(ex){ ex.value=trigger; ex.note=note; ex.zoneSrc=srcLabel; ex.fired=false; }
+      else ALERTS[tk].push({type:'price',dir:'below',value:trigger,fired:false,src:'zone',zoneSrc:srcLabel,note});
+      checkAlerts(tk, m.price, m.Final);   // 已在买区内的立即提醒一次
+      done.push({tk, trigger, srcLabel, price:m.price, inZone:m.price<=trigger});
+    }catch(e){ failed.push(tk+'·取数失败'); }
+  }
+  saveAlerts(); renderAlertBadge(); renderAlertList();
+  if(btn){ btn.disabled=false; btn.textContent='🎯 一键给【重点关注】挂买区提醒'; }
+  if(out){
+    let html='';
+    if(done.length){
+      html+='<div style="color:#3fb950;font-weight:600;margin-bottom:4px">✅ 已挂 '+done.length+' 只买区提醒（价格回落到买区上沿即通知）：</div>';
+      html+=done.map(x=>{
+        const tag=x.srcLabel==='系统技术位'?'<span class="muted">系统技术位</span>':('<span style="color:var(--accent)">'+x.srcLabel+'</span>');
+        const state=x.inZone?'<span class="pill buy">现价已在区内/下方</span>':('<span class="muted">现价 $'+fmt(x.price,2)+'，等回落</span>');
+        return '<div style="padding:3px 0">· <b>'+x.tk+'</b> 价格 ≤ $'+fmt(x.trigger,2)+' 时提醒 · '+tag+' · '+state+'</div>';
+      }).join('');
+    }
+    if(failed.length) html+='<div style="color:var(--amber);margin-top:6px">⚠️ 跳过：'+failed.join('、')+'</div>';
+    html+='<div class="muted small" style="margin-top:8px;line-height:1.5">触发时会<b>浏览器通知 + 页面提示</b>（需保持本页打开、允许通知）。价格离开买区会自动复位、再次回落会再提醒。以后新增或调整重点关注后，再点一次本按钮即可补挂。<b>数据真实·非投资建议。</b></div>';
+    out.innerHTML=html;
+  }
+}
+{ const _armBtn=$('#al_armFocus'); if(_armBtn) _armBtn.onclick=armFocusZoneAlerts; }
 
 /* =================================================================
    产业链 tab：环节→上下游公司(实时评分)+关系+瓶颈+催化剂
@@ -3726,7 +3812,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260618-0240';
+const BUILD='20260618-2000';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
