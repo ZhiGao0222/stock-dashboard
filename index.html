@@ -3351,7 +3351,7 @@ async function computeSizer(){
   out.innerHTML='<div class="muted small" style="padding:6px">抓实时数据、计算配比中…</div>';
   const tsum=buckets.reduce((a,b)=>a+b.tgt,0)||1; buckets.forEach(b=>b.adj=b.tgt/tsum*100);   // 空桶比例分给有票的桶
   const all=[...new Set(buckets.flatMap(b=>b.tks))], data={};
-  await Promise.all(all.map(async tk=>{ try{ const d=await yahoo(tk,'1y','1d'); if(d.closes&&d.closes.length>=40){ const m=computeStock(d.meta,d.closes,null,d.v); data[tk]={price:m.price,vol:m.vol||0.5,fin:m.Final,buy:buyPointOf(m).lvl}; } }catch(e){} }));
+  await Promise.all(all.map(async tk=>{ try{ const d=await yahoo(tk,'1y','1d'); if(d.closes&&d.closes.length>=40){ const m=computeStock(d.meta,d.closes,null,d.v); const z=buyZone(m); data[tk]={price:m.price,vol:m.vol||0.5,fin:m.Final,buy:buyPointOf(m).lvl,near:z.near,stop:z.stop}; } }catch(e){} }));
   let rows=[], failed=[];
   buckets.forEach(b=>{ const ok=b.tks.filter(t=>data[t]); b.tks.filter(t=>!data[t]).forEach(t=>failed.push(t)); if(!ok.length)return;
     const wOf=t=>{ const d=data[t]; return meth==='equal'?1:(meth==='score'?Math.max(1,d.fin):1/Math.max(0.08,d.vol)); };
@@ -3363,20 +3363,24 @@ async function computeSizer(){
     const un=rows.filter(r=>!r._cap), us=un.reduce((a,r)=>a+r.pct,0); if(us<=0)break; un.forEach(r=>r.pct+=ex*r.pct/us); } }
   rows.sort((a,b)=>b.pct-a.pct);
   const wVol=rows.reduce((a,r)=>a+r.pct/100*r.vol,0), lev=rows.filter(r=>LEV_ETF.includes(r.tk)).reduce((a,r)=>a+r.pct,0), maxR=rows[0];
-  const col=`1fr 60px 66px 56px${cap?' 92px':''}`;
-  const head=`<div style="display:grid;grid-template-columns:${col};gap:4px;font-size:11px;color:var(--muted);padding:0 2px 4px"><span>票 · 桶</span><span style="text-align:right">建议%</span><span style="text-align:right">波动/分</span><span style="text-align:right">买点</span>${cap?'<span style="text-align:right">≈钱/股</span>':''}</div>`;
-  const body2=rows.map(r=>{ const amt=cap?cap*r.pct/100:0, sh=amt&&r.price?amt/r.price:0, bc=r.buy==='合适'?'#3fb950':(r.buy==='一般'?'#d29922':'#f85149');
-    return `<div style="display:grid;grid-template-columns:${col};gap:4px;align-items:center;padding:4px 2px;border-bottom:1px solid var(--border)">
-      <span><a href="#" data-stk="${r.tk}" style="color:var(--text);font-weight:700">${r.tk}</a> <span class="muted small">${r.bucket}</span></span>
-      <span style="text-align:right;font-weight:700;color:var(--accent)">${fmt(r.pct,1)}%</span>
-      <span style="text-align:right" class="small muted">${pct(r.vol*100,0)}/${r.fin}</span>
-      <span style="text-align:right;color:${bc}" class="small">${r.buy}</span>
-      ${cap?`<span style="text-align:right" class="small muted">$${fmt(amt,0)}/${fmt(sh,sh<10?2:0)}</span>`:''}</div>`; }).join('');
-  out.innerHTML=`<div class="panel sig"><div class="top"><span class="name">🧮 建议仓位配比 <span class="muted small">${meth==='invvol'?'反波动率':meth==='score'?'评分加权':'等权'}·${T.label}</span></span><span class="small">合计 <b>${fmt(rows.reduce((a,r)=>a+r.pct,0),0)}%</b></span></div>
-    ${head}${body2}
-    <div class="small muted" style="margin-top:6px">加权年化波动 <b>${pct(wVol*100,0)}</b>${lev>0?` · ⚠️杠杆ETF ${fmt(lev,0)}%(每日复利衰减)`:''}${maxR&&maxR.pct>30?` · ⚠️最大单仓 ${maxR.tk} ${fmt(maxR.pct,0)}%偏集中`:''}${cap?` · 总资金 $${fmt(cap,0)}`:''}</div>
+  // 分批进场：每只目标拆成「现在先建 + 回踩加 + 深跌补」三批；首批比例按买点(合适多买/不佳先少买)
+  rows.forEach(r=>{ const f1=r.buy==='合适'?0.5:(r.buy==='一般'?0.34:0.2);
+    r.now=r.pct*f1; const rest=r.pct-r.now; r.add1=rest*0.55; r.add2=rest*0.45;
+    r.deeper=(r.near||r.price*0.95)*0.95; });
+  const totNow=rows.reduce((a,r)=>a+r.now,0), totRest=rows.reduce((a,r)=>a+r.pct,0)-totNow;
+  const bcOf=b=>b==='合适'?'#3fb950':(b==='一般'?'#d29922':'#f85149');
+  const blocks=rows.map(r=>{ const amtNow=cap?cap*r.now/100:0, shNow=amtNow&&r.price?amtNow/r.price:0;
+    return `<div style="padding:6px 2px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
+        <span><a href="#" data-stk="${r.tk}" style="color:var(--text);font-weight:700">${r.tk}</a> <span class="muted small">${r.bucket} · $${fmt(r.price,2)} · 买点<b style="color:${bcOf(r.buy)}">${r.buy}</b></span></span>
+        <span class="small">目标 <b>${fmt(r.pct,1)}%</b> → <span style="color:var(--accent)">现在先建 <b>${fmt(r.now,1)}%</b></span>${cap?` <span class="muted">≈$${fmt(amtNow,0)}/${fmt(shNow,shNow<10?2:0)}股</span>`:''}</span></div>
+      <div class="small muted" style="margin-top:2px">加仓：回踩 $${fmt(r.near||r.price,2)} 再加 <b>${fmt(r.add1,1)}%</b> · 深跌 $${fmt(r.deeper,2)} 补 <b>${fmt(r.add2,1)}%</b> · 跌破 $${fmt(r.stop,2)} 止损</div></div>`; }).join('');
+  out.innerHTML=`<div class="panel sig" style="border-color:var(--accent)"><div class="top"><span class="name">🚦 分批进场计划 <span class="muted small">${meth==='invvol'?'反波动率':meth==='score'?'评分加权':'等权'}·${T.label}</span></span><span class="small">目标合计 <b>${fmt(rows.reduce((a,r)=>a+r.pct,0),0)}%</b></span></div>
+    <div class="small" style="margin:4px 0 2px">👉 建议<b style="color:var(--accent)">现在先投入 ~${fmt(totNow,0)}%</b>${cap?`(≈$${fmt(cap*totNow/100,0)})`:''}，其余 <b>~${fmt(totRest,0)}%</b> 留作回踩/深跌时分批加仓的弹药(别一次梭哈)。</div></div>
+    <div class="panel sig">${blocks}
+    <div class="small muted" style="margin-top:6px">「现在先建」比例按<b>买点</b>定：合适→先建50%、一般→先建⅓、不佳→只先建20%(多等回调)；加仓价/止损由均线与20日低推算。加权波动 <b>${pct(wVol*100,0)}</b>${lev>0?` · ⚠️杠杆ETF ${fmt(lev,0)}%`:''}${maxR&&maxR.pct>30?` · ⚠️最大单仓 ${maxR.tk} ${fmt(maxR.pct,0)}%`:''}。</div>
     ${failed.length?`<div class="small" style="color:var(--amber);margin-top:4px">取数失败(非美股/代码错)：${failed.join('、')} —— 未计入</div>`:''}
-    <div class="small muted" style="margin-top:4px">桶内默认<b>反波动率</b>(波动越低权重越高、控风险)，可切评分加权/等权；空桶比例已按比例分给有票的桶。<b>透明算法·参考·非投资建议</b>，自行判断、控仓止损。</div></div>`;
+    <div class="small muted" style="margin-top:4px"><b>透明算法·参考·非投资建议</b>，分批步数/价位/止损按你自己承受度调。</div></div>`;
 }
 /* 一键把「观察中+重点关注」按波动率自动分到三个桶 */
 async function sizerPrefill(){
@@ -3544,7 +3548,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260617-2050';
+const BUILD='20260617-2110';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
