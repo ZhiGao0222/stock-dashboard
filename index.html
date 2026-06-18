@@ -3243,6 +3243,8 @@ const STRAT_BUCKETS={conservative:{safe:70,etf:20,growth:10,label:'保守'},bala
 let stratStyle='balanced', stratBase='port', stratMode='checkup';
 let SIZER=Object.assign({safe:'',etf:'',growth:'',method:'invvol',cap:'',maxw:'',deploy:'100',tranches:3}, load('sizer',{}));
 let _szLock=new Set();   // 锁定的票(配平时不动)
+let _szFrozen=null;      // 载入已存方案时=定格的占比{tk:%}，不再重算覆盖
+let SIZER_PLANS=load('sizerPlans',{});   // 已保存的方案
 function isETF(tk){ const s=sectorOf(tk); return /ETF|债券|黄金/.test(s) || ['VOO','SPY','IVV','VTI','QQQ','DIA','IWM','ARKK','SCHD','VIG','RSP','EWZ','EWY'].includes(tk) || /^XL[A-Z]$/.test(tk); }
 function bucketOf(tk,vol){ if(isETF(tk))return 'etf'; if(vol!=null&&vol>=0.45)return 'growth'; return 'safe'; }
 async function loadStrategy(){
@@ -3365,7 +3367,8 @@ async function computeSizer(){
     const wOf=t=>{ const d=data[t]; return meth==='equal'?1:(meth==='score'?Math.max(1,d.fin):1/Math.max(0.08,d.vol)); };
     const ws=ok.map(wOf), sum=ws.reduce((a,x)=>a+x,0)||1;
     ok.forEach((t,i)=>rows.push({tk:t,bucket:b.lab,pct:b.adj*ws[i]/sum,...data[t]})); });
-  const capPct=parseFloat(SIZER.maxw)||0;   // 单仓上限：超过则削到上限、多出的按比例分给未封顶的
+  if(_szFrozen){ rows.forEach(r=>{ if(_szFrozen[r.tk]!=null) r.pct=_szFrozen[r.tk]; }); }   // 定格方案：直接用保存的占比，不重算
+  const capPct=_szFrozen?0:(parseFloat(SIZER.maxw)||0);   // 单仓上限(定格时不削)：超过则削到上限、多出的按比例分给未封顶的
   if(capPct>0 && rows.length){ for(let it=0;it<8;it++){ const over=rows.filter(r=>r.pct>capPct+0.05&&!r._cap); if(!over.length)break;
     let ex=0; over.forEach(r=>{ ex+=r.pct-capPct; r.pct=capPct; r._cap=true; });
     const un=rows.filter(r=>!r._cap), us=un.reduce((a,r)=>a+r.pct,0); if(us<=0)break; un.forEach(r=>r.pct+=ex*r.pct/us); } }
@@ -3381,12 +3384,19 @@ async function computeSizer(){
       <div class="small szplan" data-tk="${r.tk}" style="margin-top:2px"></div></div>`).join('');
   out.innerHTML=`<div class="panel sig" style="border-color:var(--accent)"><div class="top"><span class="name">🚦 分批进场计划 <span class="muted small">${meth==='invvol'?'反波动率':meth==='score'?'评分加权':'等权'}·${T.label}·${N}批</span></span><span class="small" id="szTotal"></span></div>
     <div class="small" id="szNow" style="margin:4px 0 2px"></div>
-    <div class="row" style="gap:6px;align-items:center;margin-top:2px"><span class="small muted">占比可手动改、点 🔓/🔒 锁定某只</span><button class="btn small" data-sizerbal="1" style="margin-left:auto">🔄 配平未锁定到目标仓位</button></div></div>
+    <div class="row" style="gap:6px;align-items:center;margin-top:2px"><span class="small muted">占比可手动改、点 🔓/🔒 锁定某只</span><button class="btn small" data-sizerbal="1" style="margin-left:auto">🔄 配平未锁定到目标仓位</button></div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px;border-top:1px solid var(--border);padding-top:7px">
+      <span class="small">${_szFrozen?'📌 <b style="color:var(--accent)">已定格方案</b>(可继续改/另存)':'调好后可<b>定格保存</b>'}</span>
+      <input id="sz_planname" placeholder="方案名 如 方案1" style="width:120px">
+      <button class="btn small" data-sizersave="1">💾 保存为方案</button>
+      <span class="small" id="szSaveMsg" style="color:#3fb950"></span></div>
+    <div id="szPlans" class="row" style="gap:5px;flex-wrap:wrap;margin-top:5px"></div></div>
     <div class="panel sig">${blocks}
     <div class="small muted" style="margin-top:6px">「现在先建」比例按<b>买点</b>定：合适→先建50%、一般→先建⅓、不佳→只先建20%(多等回调)；加仓价/止损由均线与20日低推算。加权波动 <b>${pct(wVol*100,0)}</b>${lev>0?` · ⚠️杠杆ETF ${fmt(lev,0)}%`:''}${maxR&&maxR.pct>30?` · ⚠️最大单仓 ${maxR.tk} ${fmt(maxR.pct,0)}%`:''}。</div>
     ${failed.length?`<div class="small" style="color:var(--amber);margin-top:4px">取数失败(非美股/代码错)：${failed.join('、')} —— 未计入</div>`:''}
     <div class="small muted" style="margin-top:4px"><b>透明算法·参考·非投资建议</b>，占比/分批/价位/止损按你自己承受度调。</div></div>`;
   sizerManualUpdate();   // 填充分批文本 + 合计 + 现在投入
+  renderPlanChips();
 }
 /* 手动调占比：读各输入框 → 即时重算每只分批 + 合计 + 现在投入 */
 let _szData={};
@@ -3406,6 +3416,25 @@ function sizerManualUpdate(){
     if(d){ const r=_szPlanText(pct,d,cap,N); totNow+=r.now; const sp=document.querySelector('.szplan[data-tk="'+tk+'"]'); if(sp)sp.innerHTML=r.html; } });
   const tEl=document.getElementById('szTotal'); if(tEl){ const ok=Math.abs(tot-deploy)<0.6; tEl.innerHTML=`合计 <b style="color:${ok?'#3fb950':'#d29922'}">${fmt(tot,0)}%</b> <span class="muted">/ 目标仓位 ${fmt(deploy,0)}%</span>`; }
   const nEl=document.getElementById('szNow'); if(nEl) nEl.innerHTML=`👉 现在先投入 <b style="color:var(--accent)">~${fmt(totNow,0)}%</b>${cap?`(≈$${fmt(cap*totNow/100,0)})`:''} · 其余 <b>~${fmt(Math.max(0,tot-totNow),0)}%</b> 留作回调加仓 · 现金 <b>~${fmt(Math.max(0,100-tot),0)}%</b>`;
+}
+/* 方案：把当前(可能手动调过的)占比+设置存成具名方案，载入时定格、不再重算覆盖 */
+function renderPlanChips(){
+  const box=document.getElementById('szPlans'); if(!box)return;
+  const names=Object.keys(SIZER_PLANS);
+  box.innerHTML = names.length? ('<span class="small muted" style="align-self:center">已存方案:</span>'+names.map(n=>`<span class="pill" style="cursor:pointer"><span data-planload="${n}">📋 ${n}</span> <span data-plandel="${n}" style="color:var(--red);cursor:pointer" title="删除">✕</span></span>`).join('')) : '';
+}
+function sizerSavePlan(){
+  const nm=((document.getElementById('sz_planname')||{}).value||'').trim()||('方案'+(Object.keys(SIZER_PLANS).length+1));
+  const pcts={}; document.querySelectorAll('.szpct').forEach(i=>pcts[i.dataset.tk]=parseFloat(i.value)||0);
+  if(!Object.keys(pcts).length){ return; }
+  SIZER_PLANS[nm]={safe:SIZER.safe,etf:SIZER.etf,growth:SIZER.growth,deploy:SIZER.deploy,method:SIZER.method,tranches:SIZER.tranches,cap:SIZER.cap,maxw:SIZER.maxw,pcts}; save('sizerPlans',SIZER_PLANS);
+  renderPlanChips(); const m=document.getElementById('szSaveMsg'); if(m){ m.textContent='已定格「'+nm+'」✓'; setTimeout(()=>{if(m)m.textContent='';},2600); }
+}
+function sizerLoadPlan(nm){
+  const p=SIZER_PLANS[nm]; if(!p)return;
+  Object.assign(SIZER,{safe:p.safe,etf:p.etf,growth:p.growth,deploy:p.deploy,method:p.method,tranches:p.tranches,cap:p.cap,maxw:p.maxw}); save('sizer',SIZER);
+  _szFrozen=p.pcts||{}; _szLock=new Set();
+  renderSizer();   // 用方案设置重渲染表单 + 自动按定格占比显示
 }
 /* 配平：锁定的不动，剩余目标仓位(总仓位-锁定合计)按当前比例分给未锁定的 */
 function sizerRebalance(){
@@ -3433,15 +3462,20 @@ document.addEventListener('click',e=>{
   const st=e.target.closest('[data-sizertranches]'); if(st){ SIZER.tranches=+st.dataset.sizertranches; save('sizer',SIZER); document.querySelectorAll('[data-sizertranches]').forEach(b=>b.classList.toggle('on',b===st)); sizerManualUpdate(); return; }
   const slk=e.target.closest('.szlock'); if(slk){ const tk=slk.dataset.tk; if(_szLock.has(tk))_szLock.delete(tk); else _szLock.add(tk); slk.textContent=_szLock.has(tk)?'🔒':'🔓'; return; }
   const sba=e.target.closest('[data-sizerbal]'); if(sba){ sizerRebalance(); return; }
-  const sg=e.target.closest('[data-sizergo]'); if(sg){ computeSizer(); return; }
+  const sps=e.target.closest('[data-sizersave]'); if(sps){ sizerSavePlan(); return; }
+  const spl=e.target.closest('[data-planload]'); if(spl){ sizerLoadPlan(spl.dataset.planload); return; }
+  const spd=e.target.closest('[data-plandel]'); if(spd){ delete SIZER_PLANS[spd.dataset.plandel]; save('sizerPlans',SIZER_PLANS); renderPlanChips(); return; }
+  const sg=e.target.closest('[data-sizergo]'); if(sg){ _szFrozen=null; computeSizer(); return; }
   const sk=e.target.closest('#strategy [data-stk]'); if(sk){ e.preventDefault(); $('#stkInput').value=sk.dataset.stk; openTab('stock'); analyzeStock(sk.dataset.stk); return; }
   const ss=e.target.closest('[data-stratstyle]'); if(ss){ stratStyle=ss.dataset.stratstyle; document.querySelectorAll('[data-stratstyle]').forEach(b=>b.classList.toggle('on',b===ss)); loadStrategy(); return; }
   const sb=e.target.closest('[data-stratbase]'); if(sb){ stratBase=sb.dataset.stratbase; document.querySelectorAll('[data-stratbase]').forEach(b=>b.classList.toggle('on',b===sb)); loadStrategy(); return; }
   const sr=e.target.closest('[data-stratrefresh]'); if(sr){ loadStrategy(); return; }
 });
-document.addEventListener('input',e=>{   // 手动改占比/总资金→即时重算；改总仓位→按比例配平
-  if(e.target.id==='sz_deploy'){ if(document.querySelector('.szpct')) sizerRebalance(); return; }
+document.addEventListener('input',e=>{   // 手动改占比/总资金→只更新文字与合计(不动其它输入框，不打扰你输入)
   if((e.target.classList&&e.target.classList.contains('szpct'))||e.target.id==='sz_cap'){ if(document.querySelector('.szpct')) sizerManualUpdate(); }
+});
+document.addEventListener('change',e=>{   // 改完总仓位(失焦/回车)才按比例配平，避免边打字边跳
+  if(e.target.id==='sz_deploy'){ if(document.querySelector('.szpct')) sizerRebalance(); }
 });
 function refreshTab(tab, force){
   if(!tab)return;
@@ -3589,7 +3623,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260617-2200';
+const BUILD='20260617-2230';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
