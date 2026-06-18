@@ -3247,7 +3247,7 @@ document.addEventListener('click',e=>{
    ================================================================= */
 const STRAT_BUCKETS={conservative:{safe:70,etf:20,growth:10,label:'保守'},balanced:{safe:50,etf:25,growth:25,label:'平衡'},aggressive:{safe:35,etf:15,growth:50,label:'进取'}};
 let stratStyle='balanced', stratBase='port', stratMode='checkup';
-let SIZER=Object.assign({safe:'',etf:'',growth:'',method:'invvol',cap:'',maxw:'',deploy:'100',tranches:3,stepMode:'atr',stopMode:'atr',firstMode:'buy'}, load('sizer',{}));
+let SIZER=Object.assign({safe:'',etf:'',growth:'',method:'invvol',cap:'',maxw:'',deploy:'100',tranches:3,stepMode:'atr',stopMode:'struct',firstMode:'buy'}, load('sizer',{}));
 let _szLock=new Set();   // 锁定的票(配平时不动)
 let _szFrozen=null;      // 载入已存方案时=定格的占比{tk:%}，不再重算覆盖
 let SIZER_PLANS=load('sizerPlans',{});   // 已保存的方案
@@ -3348,11 +3348,11 @@ function renderSizer(){
     </div>
     <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">
       <span class="small muted">下探间隔</span>${sb('atr','ATR自适应')}${sb('5','5%')}${sb('8','8%')}${sb('10','10%')}
-      <i class="ctrlsep"></i><span class="small muted">止损</span>${tb('atr','ATR(支撑−1ATR)')}${tb('1.5','1.5%')}${tb('3','3%')}${tb('5','5%')}
+      <i class="ctrlsep"></i><span class="small muted">止损</span>${tb('struct','结构·长线(跌破52周低)')}${tb('atr','ATR·短线')}${tb('5','固定5%')}${tb('none','无硬止损')}
     </div>
     <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">
       <span class="small muted">首批</span>${fb('buy','按买点(合适½/一般⅓/不佳⅕)')}${fb('half','固定½')}${fb('third','固定⅓')}
-      <span class="small muted" style="margin-left:auto">ℹ️ 默认 ATR 自适应(按各股波动定间隔/止损·教科书ATR法)</span>
+      <span class="small muted" style="margin-left:auto">ℹ️ 默认<b>长线</b>：止损放在52周低之下(低位震荡不会被洗)、低位优先补仓</span>
     </div>
     <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">
       <span class="small muted">总仓位%</span><input id="sz_deploy" type="number" value="${SIZER.deploy||'100'}" placeholder="100" style="width:54px"><span class="small muted">(其余现金)</span>
@@ -3381,7 +3381,7 @@ async function computeSizer(){
   const all=[...new Set(buckets.flatMap(b=>b.tks))], data={};
   await Promise.all(all.map(async tk=>{ try{ const d=await yahoo(tk,'1y','1d'); if(d.closes&&d.closes.length>=40){ const m=computeStock(d.meta,d.closes,null,d.v);
     const sups=[m.ma10,m.ma50,m.ma200,m.lo20].filter(v=>v!=null&&v<m.price).sort((a,b)=>b-a); const near=sups[0]||m.lo20||m.price*0.95;
-    data[tk]={price:m.price,vol:m.vol||0.5,fin:m.Final,buy:buyPointOf(m).lvl,near,lo20:m.lo20,atr:atr14(d.h,d.l,d.c)||m.price*0.05}; } }catch(e){} }));
+    data[tk]={price:m.price,vol:m.vol||0.5,fin:m.Final,buy:buyPointOf(m).lvl,near,lo20:m.lo20,lo52:Math.min(...d.closes.slice(-252)),ma200:m.ma200,atr:atr14(d.h,d.l,d.c)||m.price*0.05}; } }catch(e){} }));
   let rows=[], failed=[];
   buckets.forEach(b=>{ const ok=b.tks.filter(t=>data[t]); b.tks.filter(t=>!data[t]).forEach(t=>failed.push(t)); if(!ok.length)return;
     const wOf=t=>{ const d=data[t]; return meth==='equal'?1:(meth==='score'?Math.max(1,d.fin):1/Math.max(0.08,d.vol)); };
@@ -3412,7 +3412,7 @@ async function computeSizer(){
       <span class="small" id="szSaveMsg" style="color:#3fb950"></span></div>
     <div id="szPlans" class="row" style="gap:5px;flex-wrap:wrap;margin-top:5px"></div></div>
     <div class="panel sig">${blocks}
-    <div class="small muted" style="margin-top:6px">首批=${(SIZER.firstMode||'buy')==='half'?'固定½':(SIZER.firstMode==='third'?'固定⅓':'按买点(合适½/一般⅓/不佳⅕)')}；下探间隔=${(SIZER.stepMode||'atr')==='atr'?'<b>1×ATR</b>(按各股波动)':SIZER.stepMode+'%'}；止损=${(SIZER.stopMode||'atr')==='atr'?'支撑(20日低)<b>−1×ATR</b>':'支撑−'+SIZER.stopMode+'%'}。加权波动 <b>${pct(wVol*100,0)}</b>${lev>0?` · ⚠️杠杆ETF ${fmt(lev,0)}%`:''}${maxR&&maxR.pct>30?` · ⚠️最大单仓 ${maxR.tk} ${fmt(maxR.pct,0)}%`:''}。</div>
+    <div class="small muted" style="margin-top:6px"><span id="szRule">${_szRuleText()}</span> 加权波动 <b>${pct(wVol*100,0)}</b>${lev>0?` · ⚠️杠杆ETF ${fmt(lev,0)}%`:''}${maxR&&maxR.pct>30?` · ⚠️最大单仓 ${maxR.tk} ${fmt(maxR.pct,0)}%`:''}。</div>
     ${failed.length?`<div class="small" style="color:var(--amber);margin-top:4px">取数失败(非美股/代码错)：${failed.join('、')} —— 未计入</div>`:''}
     <div class="small muted" style="margin-top:4px"><b>透明算法·参考·非投资建议</b>，占比/分批/价位/止损按你自己承受度调。</div></div>`;
   sizerManualUpdate();   // 填充分批文本 + 合计 + 现在投入
@@ -3427,12 +3427,23 @@ function _szPlanText(pct,d,cap,N){
   const now=pct*f1, rest=Math.max(0,pct-now), near=d.near||d.price*0.95, atr=d.atr||d.price*0.05, k=Math.max(1,N-1), each=rest/k;
   const lvl=i=>{ if(i===0)return near; if(sm==='atr')return Math.max(0.01, near - i*atr); const p=(parseFloat(sm)||5)/100; return near*Math.pow(1-p,i); };   // 下探间隔:ATR 或 固定%
   let adds=''; for(let i=0;i<k;i++){ adds+=`${i===0?'回踩':'再降'} $${fmt(lvl(i),2)} ${i===0?'加':'补'} ${fmt(each,1)}% · `; }
-  const base=Math.min(d.lo20||near, lvl(k-1));   // 止损基准=20日低与最深一档加仓价的更低者(确保止损在所有加仓之下)
-  const stop = stm==='atr'? Math.max(0.01, base-atr) : base*(1-((parseFloat(stm)||1.5)/100));   // 止损:支撑-1ATR 或 支撑-固定%
+  // 止损：结构/长线(跌破52周低,宽·低位震荡不被洗) · 无硬止损 · ATR(支撑-1ATR) · 固定%
+  let stopTxt;
+  if(stm==='none'){ stopTxt='不设硬止损·跌破长期趋势/基本面恶化再评估'; }
+  else if(stm==='struct'){ const s=(d.lo52?d.lo52*0.95:(d.ma200?d.ma200*0.85:d.price*0.6)); stopTxt=`结构止损 $${fmt(s,2)}(跌破52周低才离场)`; }
+  else { const base=Math.min(d.lo20||near, lvl(k-1)); const s=stm==='atr'?Math.max(0.01,base-atr):base*(1-((parseFloat(stm)||5)/100)); stopTxt=`止损 $${fmt(s,2)}`; }
   const amtNow=cap?cap*now/100:0, shNow=amtNow&&d.price?amtNow/d.price:0;
-  return {now, html:`<span style="color:var(--accent)">现在先建 <b>${fmt(now,1)}%</b></span>${cap?` <span class="muted">≈$${fmt(amtNow,0)}/${fmt(shNow,shNow<10?2:0)}股</span>`:''} <span class="muted">· ${adds}止损 $${fmt(stop,2)}</span>`};
+  return {now, html:`<span style="color:var(--accent)">现在先建 <b>${fmt(now,1)}%</b></span>${cap?` <span class="muted">≈$${fmt(amtNow,0)}/${fmt(shNow,shNow<10?2:0)}股</span>`:''} <span class="muted">· ${adds}${stopTxt}</span>`};
+}
+function _szRuleText(){
+  const fm=SIZER.firstMode||'buy', sm=SIZER.stepMode||'atr', stm=SIZER.stopMode||'struct';
+  const first=fm==='half'?'固定½':(fm==='third'?'固定⅓':'按买点(合适½/一般⅓/不佳⅕)');
+  const step=sm==='atr'?'1×ATR(按各股波动)':sm+'%';
+  const stop={struct:'<b>结构/长线</b>(跌破52周低×0.95才离场·低位震荡不被洗)',atr:'支撑(20日低)−1×ATR(短线)',none:'<b>无硬止损</b>(跌破长期趋势/基本面恶化再评估)'}[stm]||('支撑−'+stm+'%');
+  return `首批=${first}；下探间隔=${step}；止损=${stop}。`;
 }
 function sizerManualUpdate(){
+  const rl=document.getElementById('szRule'); if(rl)rl.innerHTML=_szRuleText();
   const cap=parseFloat((document.getElementById('sz_cap')||{}).value)||0;
   const deploy=Math.max(1,Math.min(100,parseFloat((document.getElementById('sz_deploy')||{}).value)||100)), N=+SIZER.tranches||3;
   let tot=0, totNow=0;
@@ -3653,7 +3664,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260618-0010';
+const BUILD='20260618-0055';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
