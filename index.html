@@ -3471,7 +3471,9 @@ document.addEventListener('click',e=>{
   const sb=e.target.closest('[data-stratbase]'); if(sb){ stratBase=sb.dataset.stratbase; document.querySelectorAll('[data-stratbase]').forEach(b=>b.classList.toggle('on',b===sb)); loadStrategy(); return; }
   const sr=e.target.closest('[data-stratrefresh]'); if(sr){ loadStrategy(); return; }
 });
+const _SZF={sz_safe:'safe',sz_etf:'etf',sz_growth:'growth',sz_deploy:'deploy',sz_cap:'cap',sz_max:'maxw'};
 document.addEventListener('input',e=>{   // 手动改占比/总资金→只更新文字与合计(不动其它输入框，不打扰你输入)
+  if(_SZF[e.target.id]){ SIZER[_SZF[e.target.id]]=e.target.value; save('sizer',SIZER); }   // 边填边存→任何重渲染都不丢
   if((e.target.classList&&e.target.classList.contains('szpct'))||e.target.id==='sz_cap'){ if(document.querySelector('.szpct')) sizerManualUpdate(); }
 });
 document.addEventListener('change',e=>{   // 改完总仓位(失焦/回车)才按比例配平，避免边打字边跳
@@ -3591,8 +3593,9 @@ $('#testConnBtn').onclick=async()=>{
 };
 
 let timer=null, alertTimer=null;
+const NO_AUTOREFRESH=['strategy','rank','myk'];   // 这些是交互/输入页(配比助手等)，定时刷新会把你填的清掉 → 不自动刷新
 function startTimer(){
-  clearInterval(timer); timer=setInterval(()=>refreshTab(activeTab(),true),CFG.refreshSec*1000);
+  clearInterval(timer); timer=setInterval(()=>{ const t=activeTab(); if(!NO_AUTOREFRESH.includes(t)) refreshTab(t,true); },CFG.refreshSec*1000);
   clearInterval(alertTimer); alertTimer=setInterval(pollAlerts, Math.max(60,CFG.refreshSec)*1000);  // 后台预警轮询(不分标签页)
 }
 
@@ -3623,7 +3626,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260617-2230';
+const BUILD='20260617-2300';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
