@@ -135,6 +135,14 @@
   @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
   .panel.sig.alerted{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
   .held{color:#e3b341;font-size:.82em;margin-left:3px;cursor:default;vertical-align:middle}
+  .brief-live{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--red);font-weight:600;vertical-align:middle}
+  .brief-live::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--red);animation:briefpulse 1.6s infinite}
+  @keyframes briefpulse{0%{box-shadow:0 0 0 0 rgba(248,81,73,.55)}70%{box-shadow:0 0 0 6px rgba(248,81,73,0)}100%{box-shadow:0 0 0 0 rgba(248,81,73,0)}}
+  .brief-sec{margin-bottom:11px}
+  .brief-sec-h{font-size:12px;font-weight:700;margin:0 0 6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .mover{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:7px;border:1px solid var(--border);background:var(--panel2);font-size:12px;margin:0 5px 5px 0}
+  .brief-news-item a.t{display:block;color:var(--text);text-decoration:none}
+  .brief-news-item a.t:hover{text-decoration:underline;color:var(--accent)}
   /* K线/折线 悬停十字光标 + 日期提示(类 Robinhood) */
   .chart{position:relative}
   .cx-line{position:absolute;top:0;width:1px;background:rgba(139,148,158,.6);pointer-events:none;display:none;z-index:4}
@@ -279,8 +287,12 @@
     <div class="panel" style="flex:0 0 auto"><h3>宏观行情 · 实时 <span class="tag" id="macroUpdated"></span></h3>
       <div class="grid" style="grid-template-columns:repeat(9,1fr);gap:8px" id="macroRow"><div class="muted small">加载中…</div></div></div>
     <div style="flex:1 1 auto;min-height:0;display:grid;grid-template-columns:0.85fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:10px">
-      <div class="panel scrolly" style="grid-row:1/3"><h3>🔄 板块轮动 <span class="tag" id="sectorUpdated"></span></h3>
-        <div id="sectorRot"><div class="muted small">加载中…</div></div></div>
+      <div style="grid-row:1/3;display:flex;flex-direction:column;gap:10px;min-height:0">
+        <div class="panel scrolly" style="flex:1 1 0;min-height:0"><h3>🔄 板块轮动 <span class="tag" id="sectorUpdated"></span></h3>
+          <div id="sectorRot"><div class="muted small">加载中…</div></div></div>
+        <div class="panel scrolly" style="flex:1 1 0;min-height:0"><h3>📌 今日速览 <span id="briefLive" class="brief-live">实时</span> <span class="tag" id="briefUpdated"></span></h3>
+          <div id="todayBrief"><div class="muted small">加载中…</div></div></div>
+      </div>
       <div class="panel cpanel"><h3>标普500 <span class="chart-ctrl" id="mSpxCtrl"></span></h3>
         <div id="mSpxChart" class="chart"></div></div>
       <div class="panel cpanel"><h3>纳指100 <span class="chart-ctrl" id="mNdxCtrl"></span></h3>
@@ -1957,6 +1969,106 @@ async function loadMacroRow(){
   $('#macroUpdated').textContent='更新于 '+new Date().toLocaleTimeString('zh-CN');
 }
 let marketFetched=false;
+/* =================================================================
+   📌 今日速览（市场动向·板块轮动下方）：① ⚡我的雷达(持仓/关注当日异动·进买区·触发预警) ② 📰今日要闻(重大事件)
+   + 后台 pollMovers：持仓大波动→浏览器通知（页面开着时第一时间）。复用新闻管线 / zoneFor / heldMark。
+   ================================================================= */
+let _radarData=[], _briefNewsAt=0, moverTimer=null, _moverNotified={};
+function loadTodayBrief(){
+  const box=$('#todayBrief'); if(!box)return;
+  if(!box.dataset.init){ box.dataset.init='1';
+    box.innerHTML=`<div class="brief-sec"><div class="brief-sec-h">⚡ 实时异动 · 我的雷达 <span class="muted" style="font-weight:400;font-size:11px">持仓/关注·当日波动·进买区·触发预警</span></div><div id="briefRadar"><div class="muted small">扫描中…</div></div></div>`+
+      `<div class="brief-sec" style="margin-bottom:2px"><div class="brief-sec-h">📰 今日要闻 · 重大事件 <span class="muted" style="font-weight:400;font-size:11px">只挑会推动板块/个股的大事</span></div><div id="briefNews"><div class="muted small">加载要闻…</div></div></div>`;
+  }
+  loadBriefRadar();
+  loadBriefNews();
+}
+async function loadBriefRadar(){
+  const el=$('#briefRadar'); if(!el)return;
+  const held=[...new Set(PORT.positions.map(p=>normTk(p.ticker)))];
+  const watchOnly=[...new Set(WATCH.map(w=>normTk(w.ticker)))].filter(t=>!held.includes(t));
+  const tks=[...held,...watchOnly];
+  if(!tks.length){ el.innerHTML='<div class="muted small">还没有持仓/关注——加进来后这里会实时盯它们的当日异动、进买区、触发预警。</div>'; $('#briefUpdated').textContent=''; return; }
+  await _ensureBlogData();
+  const ok=(await mapLimit(tks,8, async tk=>{
+    try{ const d=await yahoo(tk,'1y','1d'); if(!d.closes||d.closes.length<20)return null;
+      const m=computeStock(d.meta,d.closes,null,d.v);
+      const prev=d.closes.length>=2?d.closes[d.closes.length-2]:null;
+      const day=prev?(m.price-prev)/prev*100:null;
+      return {tk, price:m.price, day, hi:d.meta.fiftyTwoWeekHigh, lo:d.meta.fiftyTwoWeekLow, held:held.includes(tk), z:zoneFor(tk,m)};
+    }catch(e){ return null; }
+  })).filter(Boolean);
+  _radarData=ok;
+  const MOVE=parseFloat(CFG.moveAlert)||5;
+  const movers=ok.filter(x=>x.day!=null&&Math.abs(x.day)>=3).sort((a,b)=>Math.abs(b.day)-Math.abs(a.day));
+  const newHi=ok.filter(x=>x.hi&&x.price>=x.hi*0.999).map(x=>x.tk);
+  const newLo=ok.filter(x=>x.lo&&x.price<=x.lo*1.001).map(x=>x.tk);
+  const inZone=ok.filter(x=>x.z&&x.z.trigger!=null&&!isNaN(x.z.trigger)&&x.price<=x.z.trigger).map(x=>x.tk);
+  const fired=[...new Set(alertRules().filter(r=>r.r.fired).map(r=>r.tk))];
+  let html = movers.length
+    ? '<div style="margin-bottom:6px">'+movers.slice(0,8).map(x=>{ const col=x.day>=0?'#3fb950':'#f85149', big=Math.abs(x.day)>=MOVE;
+        return `<span class="mover"${big?` style="border-color:${col}"`:''}><a href="#" data-stk="${x.tk}" style="color:var(--text);font-weight:700">${x.tk}</a>${x.held?heldMark(x.tk):''} <b style="color:${col}">${x.day>=0?'+':''}${fmt(x.day,1)}%</b>${big?' 🔥':''}</span>`; }).join('')+'</div>'
+    : '<div class="muted small" style="margin-bottom:6px">持仓/关注今日波动平静（无 ≥3% 异动）。</div>';
+  const flags=[];
+  if(inZone.length) flags.push(['🎯 进买区(限制区)', inZone, '#3fb950']);
+  if(fired.length) flags.push(['🔔 触发预警', fired, 'var(--amber)']);
+  if(newHi.length) flags.push(['📈 创52周新高', newHi, '#3fb950']);
+  if(newLo.length) flags.push(['📉 创52周新低', newLo, '#f85149']);
+  if(flags.length) html+=flags.map(([lab,arr,c])=>`<div class="small" style="margin:2px 0"><span style="color:${c};font-weight:600">${lab}</span>：${arr.map(t=>`<a href="#" data-stk="${t}" style="color:var(--text);font-weight:600">${t}</a>`).join('、')}</div>`).join('');
+  el.innerHTML=html;
+  $('#briefUpdated').textContent='更新于 '+new Date().toLocaleTimeString('zh-CN');
+  pollMovers();   // 顺带做一次持仓异动通知判断
+}
+async function loadBriefNews(){
+  const el=$('#briefNews'); if(!el)return;
+  if(_briefNewsAt && Date.now()-_briefNewsAt<300000 && el.querySelector('.brief-news-item')) return;   // 5分钟内不重复抓
+  let news=[]; try{ news=await collectMaterialNews(6); }catch(e){}
+  _briefNewsAt=Date.now();
+  if(!news.length){ if(!el.querySelector('.brief-news-item')) el.innerHTML='<div class="muted small">暂无重大事件新闻（抓取中，或近期无大事）。</div>'; return; }
+  const held=new Set(PORT.positions.map(p=>normTk(p.ticker))), watch=new Set(WATCH.map(w=>normTk(w.ticker)));
+  el.innerHTML=news.map(n=>{ const g=n.g, dCls=g.dir==='利好'?'buy':(g.dir==='利空'?'sell':'');
+    const cat=`<span class="pill" style="background:rgba(88,166,255,.16);color:#79c0ff">${g.cat}</span>`;
+    const dir=g.dir?`<span class="pill ${dCls}">${g.dir}</span>`:'';
+    const mine=[...new Set(detectTickers(n.title).filter(t=>held.has(normTk(t))||watch.has(normTk(t))))];
+    const mineTag=mine.length?`<span class="pill" style="background:rgba(227,179,65,.18);color:#e3b341">★我的 ${mine.join(' ')}</span>`:'';
+    return `<div class="brief-news-item" style="padding:5px 0;border-bottom:1px solid var(--border)">
+      <a class="t" href="${n.link}" target="_blank" rel="noopener" style="font-size:12.5px;line-height:1.45">${n.title}</a>
+      <div style="margin:3px 0 0;display:flex;gap:4px;flex-wrap:wrap;align-items:center">${cat} ${dir} ${mineTag}<span class="muted" style="font-size:11px;margin-left:auto">${n.source||''} · ${timeAgo(n.date)}</span></div></div>`;
+  }).join('');
+}
+async function collectMaterialNews(maxN){
+  const topics=NEWS_TOPICS.yf, all=[];
+  await mapLimit(topics.map((_,i)=>i),4, async i=>{
+    const key='news:yf:'+i; let items=null;
+    try{ const raw=await fetchFeed(topics[i],'yf'); const seen=new Set();
+      items=raw.map(it=>{ const m=it.titleRaw.match(/^(.*) - ([^-]+)$/); return {title:m?m[1]:it.titleRaw, source:m?m[2]:(it.author||''), link:it.link, date:it.date}; })
+        .filter(n=>{const k=n.title.slice(0,16); if(!n.title||seen.has(k))return false; seen.add(k); return true;}).slice(0,11);
+      if(items.length){ try{localStorage.setItem(key,JSON.stringify(items));}catch(_){ } }
+    }catch(e){ try{ const c=localStorage.getItem(key); if(c)items=JSON.parse(c); }catch(_){ } }
+    if(items&&items.length) all.push(...items);
+  });
+  const seen=new Set(), out=[];
+  for(const n of all){ const g=tagNews(n.title); if(!g.cat)continue; const k=(n.title||'').slice(0,24); if(!k||seen.has(k))continue; seen.add(k); out.push({...n, g, ts:Date.parse(n.date)||0}); }
+  out.sort((a,b)=>b.ts-a.ts);
+  return out.slice(0,maxN);
+}
+async function pollMovers(){   // 后台：持仓当日大波动→浏览器通知(去重·每票每天每方向一次)
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const held=[...new Set(PORT.positions.map(p=>normTk(p.ticker)))]; if(!held.length)return;
+  const MOVE=parseFloat(CFG.moveAlert)||5, today=new Date().toLocaleDateString('en-CA');
+  await mapLimit(held,6, async tk=>{
+    try{ const d=await yahoo(tk,'1y','1d'); if(!d.closes||d.closes.length<2)return;
+      const price=d.meta.regularMarketPrice ?? d.closes[d.closes.length-1], prev=d.closes[d.closes.length-2]; if(!prev)return;
+      const day=(price-prev)/prev*100, key=today+(day>=0?'+':'-');
+      if(Math.abs(day)>=MOVE){ if(_moverNotified[tk]!==key){ _moverNotified[tk]=key;
+        const msg=`${tk} 今日 ${day>=0?'+':''}${fmt(day,1)}%（现价 $${fmt(price,2)}）`;
+        try{ new Notification('美股参考台 · 持仓异动', {body:msg}); }catch(e){}
+        showToast('持仓异动：'+msg);
+      } } else if(_moverNotified[tk]&&_moverNotified[tk].startsWith(today)){ delete _moverNotified[tk]; }
+    }catch(e){}
+  });
+}
+{ const _tb=$('#todayBrief'); if(_tb) _tb.addEventListener('click',e=>{ const a=e.target.closest('[data-stk]'); if(a){ e.preventDefault(); $('#stkInput').value=a.dataset.stk; openTab('stock'); analyzeStock(a.dataset.stk); } }); }
 async function loadMarket(){
   loadMacroRow();
   loadSectorRotation();
@@ -3695,7 +3807,7 @@ function refreshTab(tab, force){
   if(!force && lastLoad[tab] && now-lastLoad[tab]<20000) return;   // 20秒内不重复抓
   lastLoad[tab]=now;
   if(tab==='dash'){ loadIndicators(); loadBreadth(); if(CHARTS.dashChart)refreshChart('dashChart'); }
-  else if(tab==='market') loadMarket();
+  else if(tab==='market'){ loadMarket(); loadTodayBrief(); }
   else if(tab==='news') loadNews();
   else if(tab==='port') refreshPrices();
   else if(tab==='stock'){ showTheme(curTheme); if(CHARTS.stkChart)refreshChart('stkChart'); }   // 右栏主题/关注随标签刷新
@@ -3807,6 +3919,7 @@ const NO_AUTOREFRESH=['strategy','rank','myk'];   // 这些是交互/输入页(�
 function startTimer(){
   clearInterval(timer); timer=setInterval(()=>{ const t=activeTab(); if(!NO_AUTOREFRESH.includes(t)) refreshTab(t,true); },CFG.refreshSec*1000);
   clearInterval(alertTimer); alertTimer=setInterval(pollAlerts, Math.max(60,CFG.refreshSec)*1000);  // 后台预警轮询(不分标签页)
+  clearInterval(moverTimer); moverTimer=setInterval(pollMovers, Math.max(90,CFG.refreshSec)*1000);  // 后台持仓异动通知(不分标签页)
 }
 
 function boot(){
@@ -3832,11 +3945,12 @@ function boot(){
   setTimeout(checkDataHealth, 9000); // 9秒后若仍没拿到实时数据→弹出修复指引
   setInterval(checkDataHealth, 8000);
   setTimeout(pollAlerts, 12000);     // 启动后跑一次预警检查
+  setTimeout(pollMovers, 16000);     // 启动后做一次持仓异动通知判断
   if($('#buildTag'))$('#buildTag').textContent='build '+BUILD;
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260618-2200';
+const BUILD='20260618-2330';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
