@@ -454,7 +454,8 @@
         <label>昨日收盘·账户总值 $ <input id="prevCloseIn" type="number" step="any" style="width:100px" placeholder="如 1097"/></label>
         <span>总盈亏 = 账户总值 − 初始资金 ｜ 今日盈亏 = 账户总值 − 昨收</span>
       </div>
-      <div class="scrolly" style="flex:1 1 auto;overflow-x:auto">
+      <div class="scrolly" style="flex:1 1 auto;min-height:0">
+      <div style="overflow-x:auto">
       <table id="portTable">
         <thead><tr>
           <th>代码</th><th>股数</th><th>成本</th><th>现价</th><th>日涨幅</th>
@@ -468,6 +469,20 @@
       <div class="small muted" style="margin-top:10px">
         "信号"是基于价格/动量的技术启发式（RSI、相对200日线与52周区间），<b>不含基本面</b>，仅供筛选关注，不构成建议。
         想要"性价比"判断可在"目标价"填你的估值，自动算上行空间。
+      </div>
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+        <div class="row" style="align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <h3 style="margin:0">📅 每日盈亏日历</h3>
+          <span class="muted small">按当前持仓算·每日组合涨跌%（绿涨/红跌·颜色深浅=幅度）</span>
+          <span class="spacer"></span>
+          <button class="btn small" id="pnlPrev" style="padding:2px 11px">‹</button>
+          <span id="pnlMonth" style="min-width:84px;text-align:center;font-weight:600"></span>
+          <button class="btn small" id="pnlNext" style="padding:2px 11px">›</button>
+          <span class="tag" id="pnlSummary" style="margin-left:8px"></span>
+        </div>
+        <div id="pnlCal"><div class="muted small">打开/刷新持仓后自动生成…</div></div>
+        <div class="small muted" style="margin-top:8px">说明：用你当前持仓的股数 × 各股历史每日收盘价，重算"按现在这个组合"每天会涨跌多少（不是逐日真实账户快照，因为没有买卖流水）。当月汇总=各交易日复利。</div>
+      </div>
       </div>
     </div>
   </section>
@@ -1516,13 +1531,66 @@ function timeAgo(d){
    PORTFOLIO
    ================================================================= */
 let priceCache={}; // ticker -> {price,prev,hi,lo,ma200,rsi14}
+/* 📅 每日盈亏日历：用当前持仓×各票历史日收盘，重算"按当前组合"的每日涨跌%(绿涨红跌·深浅=幅度)。
+   数据来自 refreshPrices 已抓的日线(零额外请求)；非逐日真实账户快照(无成交流水)，是当前篮子的每日回报。 */
+let _pnlData=null, _pnlMonthOff=0;
+function _tsDate(ts){ const d=new Date(ts*1000); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); }
+function buildPnlData(series){
+  if(!series||!series.length){ _pnlData={}; return; }
+  const maps=series.map(s=>{ const m={}; for(let i=0;i<s.t.length;i++){ if(s.c[i]!=null) m[_tsDate(s.t[i])]=s.c[i]; } return {sh:s.sh, m}; });
+  const allDates=[...new Set(maps.flatMap(x=>Object.keys(x.m)))].sort();
+  const last=maps.map(()=>null), portVal={};
+  for(const ds of allDates){ let v=0, any=false;
+    maps.forEach((x,i)=>{ if(x.m[ds]!=null) last[i]=x.m[ds]; if(last[i]!=null){ v+=last[i]*x.sh; any=true; } });
+    if(any) portVal[ds]=v; }
+  const dates=Object.keys(portVal).sort(), pnl={};
+  for(let i=1;i<dates.length;i++){ const pv=portVal[dates[i-1]], cv=portVal[dates[i]]; if(pv>0) pnl[dates[i]]={pct:(cv-pv)/pv*100, usd:cv-pv}; }
+  _pnlData=pnl;
+}
+function renderPnlCalendar(){
+  const box=$('#pnlCal'); if(!box)return;
+  if(!PORT.positions.length){ box.innerHTML='<div class="muted small">还没有持仓——录入后这里按你的组合显示每天涨跌。</div>'; if($('#pnlMonth'))$('#pnlMonth').textContent=''; if($('#pnlSummary'))$('#pnlSummary').textContent=''; return; }
+  if(!_pnlData){ box.innerHTML='<div class="muted small">点"↻ 刷新现价"生成日历…</div>'; return; }
+  const now=new Date(), base=new Date(now.getFullYear(), now.getMonth()+_pnlMonthOff, 1);
+  const y=base.getFullYear(), mo=base.getMonth();
+  $('#pnlMonth').textContent=y+'年'+(mo+1)+'月';
+  const startDow=new Date(y,mo,1).getDay(), dim=new Date(y,mo+1,0).getDate();
+  const dow=['日','一','二','三','四','五','六'];
+  let html='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
+  html+=dow.map(d=>`<div class="muted" style="text-align:center;font-size:10px;padding:1px 0">${d}</div>`).join('');
+  for(let i=0;i<startDow;i++) html+='<div></div>';
+  const mData=[];
+  for(let d=1;d<=dim;d++){
+    const ds=`${y}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const rec=_pnlData[ds]; if(rec)mData.push(rec.pct);
+    const pct=rec?rec.pct:null;
+    const a=pct==null?0:Math.min(.55,Math.abs(pct)/5*.5+.1);
+    const bg=pct==null?'transparent':(pct>=0?`rgba(63,185,80,${a})`:`rgba(248,81,73,${a})`);
+    const col=pct>=0?'#3fb950':'#f85149';
+    const title=rec?`${ds} · ${rec.usd>=0?'+':''}$${fmt(rec.usd,2)}`:ds;
+    html+=`<div title="${title}" style="border:1px solid var(--border);border-radius:6px;padding:3px 3px 4px;min-height:42px;background:${bg}">
+      <div style="font-size:10px;color:var(--muted);line-height:1">${d}</div>
+      ${pct!=null?`<div style="text-align:center;font-weight:700;font-size:11.5px;color:${col};margin-top:3px">${pct>=0?'+':''}${fmt(pct,1)}%</div>`:''}</div>`;
+  }
+  html+='</div>';
+  box.innerHTML=html;
+  if(mData.length){ const comp=(mData.reduce((a,p)=>a*(1+p/100),1)-1)*100, best=Math.max(...mData), worst=Math.min(...mData);
+    $('#pnlSummary').innerHTML=`当月 <b style="color:${comp>=0?'#3fb950':'#f85149'}">${comp>=0?'+':''}${fmt(comp,1)}%</b> · 最佳 <span style="color:#3fb950">+${fmt(best,1)}%</span> · 最差 <span style="color:#f85149">${fmt(worst,1)}%</span>`;
+  } else $('#pnlSummary').textContent='本月暂无交易日数据';
+}
+{ const a=$('#pnlPrev'), b=$('#pnlNext');
+  if(a)a.onclick=()=>{ _pnlMonthOff=Math.max(-11,_pnlMonthOff-1); renderPnlCalendar(); };
+  if(b)b.onclick=()=>{ _pnlMonthOff=Math.min(0,_pnlMonthOff+1); renderPnlCalendar(); }; }
 async function refreshPrices(){
   $('#portUpdated').textContent='刷新现价中…';
   renderPort();   // 先立刻把持仓行画出来(股数/成本可见,价格随后填)，避免抓取慢时(尤其托管站)看着"没反应"
   await _ensureBlogData();   // 取博主买区(如 Freedom By 40)，用于持仓"已进买区"标记
+  const _pnlSeries=[];
   await Promise.all(PORT.positions.map(async p=>{
     try{
-      const [{meta,closes}, lp]=await Promise.all([yahoo(p.ticker,'1y','1d'), livePrice(p.ticker)]);
+      const [yd, lp]=await Promise.all([yahoo(p.ticker,'1y','1d'), livePrice(p.ticker)]);
+      const {meta,closes}=yd;
+      if(yd.t&&yd.c&&yd.c.length) _pnlSeries.push({sh:p.shares, t:yd.t, c:yd.c});
       // 真正的"昨收"=倒数第二根日K（meta.chartPreviousClose 是一年前的收盘，不能用）
       const prev = closes.length>=2 ? closes[closes.length-2] : meta.chartPreviousClose;
       const price = lp ?? meta.regularMarketPrice;   // 优先含盘后实时价
@@ -1538,6 +1606,7 @@ async function refreshPrices(){
     renderPort();   // 每只到位/失败就立即刷新，好的票不必等最慢或无效的那只
   }));
   renderPort();
+  buildPnlData(_pnlSeries); renderPnlCalendar();   // 📅 每日盈亏日历(用刚抓的日线,不额外请求)
   $('#portUpdated').textContent='更新于 '+new Date().toLocaleTimeString('zh-CN');
 }
 function renderPort(){
@@ -3950,7 +4019,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260618-2330';
+const BUILD='20260619-0030';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
