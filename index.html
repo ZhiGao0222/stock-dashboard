@@ -3177,6 +3177,12 @@ function rankUniverse(scope){
   if(scope==='all'){ for(const k in THEMES){ const t=THEMES[k]; if(t.tickers) t.tickers.forEach(tk=>set.add(tk)); } US_UNIVERSE.forEach(tk=>set.add(tk)); }
   return [...new Set([...set].filter(Boolean).map(normTk))];
 }
+/* ATR(14)：日均真实波幅($)，用于按波动率自适应下探间隔/止损(教科书 ATR 止损法) */
+function atr14(h,l,c,n=14){
+  if(!h||!l||!c||h.length<n+1)return null;
+  const tr=[]; for(let i=1;i<h.length;i++){ tr.push(Math.max(h[i]-l[i], Math.abs(h[i]-c[i-1]), Math.abs(l[i]-c[i-1]))); }
+  const last=tr.slice(-n); return last.reduce((a,x)=>a+x,0)/last.length;
+}
 /* 建议买入区间：用技术支撑(均线/20日低)推算，非价格预测 */
 function buyZone(m){
   const {price,ma10,ma50,ma200,lo20}=m, b=buyPointOf(m);
@@ -3241,7 +3247,7 @@ document.addEventListener('click',e=>{
    ================================================================= */
 const STRAT_BUCKETS={conservative:{safe:70,etf:20,growth:10,label:'保守'},balanced:{safe:50,etf:25,growth:25,label:'平衡'},aggressive:{safe:35,etf:15,growth:50,label:'进取'}};
 let stratStyle='balanced', stratBase='port', stratMode='checkup';
-let SIZER=Object.assign({safe:'',etf:'',growth:'',method:'invvol',cap:'',maxw:'',deploy:'100',tranches:3}, load('sizer',{}));
+let SIZER=Object.assign({safe:'',etf:'',growth:'',method:'invvol',cap:'',maxw:'',deploy:'100',tranches:3,stepMode:'atr',stopMode:'atr',firstMode:'buy'}, load('sizer',{}));
 let _szLock=new Set();   // 锁定的票(配平时不动)
 let _szFrozen=null;      // 载入已存方案时=定格的占比{tk:%}，不再重算覆盖
 let SIZER_PLANS=load('sizerPlans',{});   // 已保存的方案
@@ -3325,6 +3331,10 @@ function renderSizer(){
   const T=STRAT_BUCKETS[stratStyle], meth=SIZER.method||'invvol', N=+SIZER.tranches||3;
   const mb=(k,l)=>`<button class="ctrlbtn${meth===k?' on':''}" data-sizermethod="${k}">${l}</button>`;
   const nb=n=>`<button class="ctrlbtn${N===n?' on':''}" data-sizertranches="${n}">${n}批</button>`;
+  const sM=SIZER.stepMode||'atr', tM=SIZER.stopMode||'atr', fM=SIZER.firstMode||'buy';
+  const sb=(k,l)=>`<button class="ctrlbtn${sM===k?' on':''}" data-sizerstep="${k}">${l}</button>`;
+  const tb=(k,l)=>`<button class="ctrlbtn${tM===k?' on':''}" data-sizerstop="${k}">${l}</button>`;
+  const fb=(k,l)=>`<button class="ctrlbtn${fM===k?' on':''}" data-sizerfirst="${k}">${l}</button>`;
   body.innerHTML=`<div class="panel sig" style="margin-bottom:8px">
     <div class="small muted" style="margin-bottom:6px">把挑好的票按桶填进去(空格/逗号分隔)，点「计算配比」。桶目标比例跟随上方<b>${T.label}</b>风格：安全 ${T.safe}% / ETF ${T.etf}% / 潜力 ${T.growth}%(改风格即变)。</div>
     <div style="display:grid;gap:7px">
@@ -3335,6 +3345,14 @@ function renderSizer(){
     <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
       <span class="small muted">桶内权重</span>${mb('invvol','反波动率·控风险(推荐)')}${mb('score','评分加权·偏强势')}${mb('equal','等权')}
       <i class="ctrlsep"></i><span class="small muted">分批</span>${nb(2)}${nb(3)}${nb(4)}
+    </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">
+      <span class="small muted">下探间隔</span>${sb('atr','ATR自适应')}${sb('5','5%')}${sb('8','8%')}${sb('10','10%')}
+      <i class="ctrlsep"></i><span class="small muted">止损</span>${tb('atr','ATR(支撑−1ATR)')}${tb('1.5','1.5%')}${tb('3','3%')}${tb('5','5%')}
+    </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">
+      <span class="small muted">首批</span>${fb('buy','按买点(合适½/一般⅓/不佳⅕)')}${fb('half','固定½')}${fb('third','固定⅓')}
+      <span class="small muted" style="margin-left:auto">ℹ️ 默认 ATR 自适应(按各股波动定间隔/止损·教科书ATR法)</span>
     </div>
     <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:7px">
       <span class="small muted">总仓位%</span><input id="sz_deploy" type="number" value="${SIZER.deploy||'100'}" placeholder="100" style="width:54px"><span class="small muted">(其余现金)</span>
@@ -3361,7 +3379,9 @@ async function computeSizer(){
   const deploy=Math.max(1,Math.min(100,parseFloat(SIZER.deploy)||100));   // 总仓位上限(其余现金)
   const tsum=buckets.reduce((a,b)=>a+b.tgt,0)||1; buckets.forEach(b=>b.adj=b.tgt/tsum*deploy);   // 空桶比例分给有票的桶，整体缩放到总仓位
   const all=[...new Set(buckets.flatMap(b=>b.tks))], data={};
-  await Promise.all(all.map(async tk=>{ try{ const d=await yahoo(tk,'1y','1d'); if(d.closes&&d.closes.length>=40){ const m=computeStock(d.meta,d.closes,null,d.v); const z=buyZone(m); data[tk]={price:m.price,vol:m.vol||0.5,fin:m.Final,buy:buyPointOf(m).lvl,near:z.near,stop:z.stop}; } }catch(e){} }));
+  await Promise.all(all.map(async tk=>{ try{ const d=await yahoo(tk,'1y','1d'); if(d.closes&&d.closes.length>=40){ const m=computeStock(d.meta,d.closes,null,d.v);
+    const sups=[m.ma10,m.ma50,m.ma200,m.lo20].filter(v=>v!=null&&v<m.price).sort((a,b)=>b-a); const near=sups[0]||m.lo20||m.price*0.95;
+    data[tk]={price:m.price,vol:m.vol||0.5,fin:m.Final,buy:buyPointOf(m).lvl,near,lo20:m.lo20,atr:atr14(d.h,d.l,d.c)||m.price*0.05}; } }catch(e){} }));
   let rows=[], failed=[];
   buckets.forEach(b=>{ const ok=b.tks.filter(t=>data[t]); b.tks.filter(t=>!data[t]).forEach(t=>failed.push(t)); if(!ok.length)return;
     const wOf=t=>{ const d=data[t]; return meth==='equal'?1:(meth==='score'?Math.max(1,d.fin):1/Math.max(0.08,d.vol)); };
@@ -3392,7 +3412,7 @@ async function computeSizer(){
       <span class="small" id="szSaveMsg" style="color:#3fb950"></span></div>
     <div id="szPlans" class="row" style="gap:5px;flex-wrap:wrap;margin-top:5px"></div></div>
     <div class="panel sig">${blocks}
-    <div class="small muted" style="margin-top:6px">「现在先建」比例按<b>买点</b>定：合适→先建50%、一般→先建⅓、不佳→只先建20%(多等回调)；加仓价/止损由均线与20日低推算。加权波动 <b>${pct(wVol*100,0)}</b>${lev>0?` · ⚠️杠杆ETF ${fmt(lev,0)}%`:''}${maxR&&maxR.pct>30?` · ⚠️最大单仓 ${maxR.tk} ${fmt(maxR.pct,0)}%`:''}。</div>
+    <div class="small muted" style="margin-top:6px">首批=${(SIZER.firstMode||'buy')==='half'?'固定½':(SIZER.firstMode==='third'?'固定⅓':'按买点(合适½/一般⅓/不佳⅕)')}；下探间隔=${(SIZER.stepMode||'atr')==='atr'?'<b>1×ATR</b>(按各股波动)':SIZER.stepMode+'%'}；止损=${(SIZER.stopMode||'atr')==='atr'?'支撑(20日低)<b>−1×ATR</b>':'支撑−'+SIZER.stopMode+'%'}。加权波动 <b>${pct(wVol*100,0)}</b>${lev>0?` · ⚠️杠杆ETF ${fmt(lev,0)}%`:''}${maxR&&maxR.pct>30?` · ⚠️最大单仓 ${maxR.tk} ${fmt(maxR.pct,0)}%`:''}。</div>
     ${failed.length?`<div class="small" style="color:var(--amber);margin-top:4px">取数失败(非美股/代码错)：${failed.join('、')} —— 未计入</div>`:''}
     <div class="small muted" style="margin-top:4px"><b>透明算法·参考·非投资建议</b>，占比/分批/价位/止损按你自己承受度调。</div></div>`;
   sizerManualUpdate();   // 填充分批文本 + 合计 + 现在投入
@@ -3402,11 +3422,15 @@ async function computeSizer(){
 let _szData={};
 function _szPlanText(pct,d,cap,N){
   N=+N||3;
-  const f1=d.buy==='合适'?0.5:(d.buy==='一般'?0.34:0.2);
-  const now=pct*f1, rest=Math.max(0,pct-now), near=d.near||d.price*0.95, k=Math.max(1,N-1), each=rest/k;
-  let adds=''; for(let i=0;i<k;i++){ const lvl=near*Math.pow(0.95,i); adds+=`${i===0?'回踩':'再降'} $${fmt(lvl,2)} ${i===0?'加':'补'} ${fmt(each,1)}% · `; }
+  const fm=SIZER.firstMode||'buy', sm=SIZER.stepMode||'atr', stm=SIZER.stopMode||'atr';
+  const f1 = fm==='half'?0.5 : fm==='third'?0.3333 : (d.buy==='合适'?0.5:(d.buy==='一般'?0.34:0.2));   // 首批比例
+  const now=pct*f1, rest=Math.max(0,pct-now), near=d.near||d.price*0.95, atr=d.atr||d.price*0.05, k=Math.max(1,N-1), each=rest/k;
+  const lvl=i=>{ if(i===0)return near; if(sm==='atr')return Math.max(0.01, near - i*atr); const p=(parseFloat(sm)||5)/100; return near*Math.pow(1-p,i); };   // 下探间隔:ATR 或 固定%
+  let adds=''; for(let i=0;i<k;i++){ adds+=`${i===0?'回踩':'再降'} $${fmt(lvl(i),2)} ${i===0?'加':'补'} ${fmt(each,1)}% · `; }
+  const base=Math.min(d.lo20||near, lvl(k-1));   // 止损基准=20日低与最深一档加仓价的更低者(确保止损在所有加仓之下)
+  const stop = stm==='atr'? Math.max(0.01, base-atr) : base*(1-((parseFloat(stm)||1.5)/100));   // 止损:支撑-1ATR 或 支撑-固定%
   const amtNow=cap?cap*now/100:0, shNow=amtNow&&d.price?amtNow/d.price:0;
-  return {now, html:`<span style="color:var(--accent)">现在先建 <b>${fmt(now,1)}%</b></span>${cap?` <span class="muted">≈$${fmt(amtNow,0)}/${fmt(shNow,shNow<10?2:0)}股</span>`:''} <span class="muted">· ${adds}止损 $${fmt(d.stop,2)}</span>`};
+  return {now, html:`<span style="color:var(--accent)">现在先建 <b>${fmt(now,1)}%</b></span>${cap?` <span class="muted">≈$${fmt(amtNow,0)}/${fmt(shNow,shNow<10?2:0)}股</span>`:''} <span class="muted">· ${adds}止损 $${fmt(stop,2)}</span>`};
 }
 function sizerManualUpdate(){
   const cap=parseFloat((document.getElementById('sz_cap')||{}).value)||0;
@@ -3460,6 +3484,9 @@ document.addEventListener('click',e=>{
   const sme=e.target.closest('[data-sizermethod]'); if(sme){ SIZER.method=sme.dataset.sizermethod; save('sizer',SIZER); document.querySelectorAll('[data-sizermethod]').forEach(b=>b.classList.toggle('on',b===sme)); computeSizer(); return; }
   const sf=e.target.closest('[data-sizerfill]'); if(sf){ sizerPrefill(); return; }
   const st=e.target.closest('[data-sizertranches]'); if(st){ SIZER.tranches=+st.dataset.sizertranches; save('sizer',SIZER); document.querySelectorAll('[data-sizertranches]').forEach(b=>b.classList.toggle('on',b===st)); sizerManualUpdate(); return; }
+  const sstp=e.target.closest('[data-sizerstep]'); if(sstp){ SIZER.stepMode=sstp.dataset.sizerstep; save('sizer',SIZER); document.querySelectorAll('[data-sizerstep]').forEach(b=>b.classList.toggle('on',b===sstp)); sizerManualUpdate(); return; }
+  const ssto=e.target.closest('[data-sizerstop]'); if(ssto){ SIZER.stopMode=ssto.dataset.sizerstop; save('sizer',SIZER); document.querySelectorAll('[data-sizerstop]').forEach(b=>b.classList.toggle('on',b===ssto)); sizerManualUpdate(); return; }
+  const sfst=e.target.closest('[data-sizerfirst]'); if(sfst){ SIZER.firstMode=sfst.dataset.sizerfirst; save('sizer',SIZER); document.querySelectorAll('[data-sizerfirst]').forEach(b=>b.classList.toggle('on',b===sfst)); sizerManualUpdate(); return; }
   const slk=e.target.closest('.szlock'); if(slk){ const tk=slk.dataset.tk; if(_szLock.has(tk))_szLock.delete(tk); else _szLock.add(tk); slk.textContent=_szLock.has(tk)?'🔒':'🔓'; return; }
   const sba=e.target.closest('[data-sizerbal]'); if(sba){ sizerRebalance(); return; }
   const sps=e.target.closest('[data-sizersave]'); if(sps){ sizerSavePlan(); return; }
@@ -3626,7 +3653,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260617-2300';
+const BUILD='20260618-0010';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
