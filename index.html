@@ -171,6 +171,7 @@
     <button class="tab" data-tab="chain">🔗 产业链</button>
     <button class="tab" data-tab="gurus">🧑‍💼 名人持仓</button>
     <button class="tab" data-tab="rank">🏆 推荐排名</button>
+    <button class="tab" data-tab="strategy">🎛️ 交易策略</button>
     <button class="tab active" data-tab="market">🌐 市场动向</button>
     <button class="tab" data-tab="news">📰 全球新闻</button>
     <button class="tab" data-tab="bloggers">📡 博主追踪</button>
@@ -342,7 +343,7 @@
       <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
         <span class="small muted">范围</span>
         <button class="ctrlbtn on" data-rankscope="mine">我的+名人(快)</button>
-        <button class="ctrlbtn" data-rankscope="all">全市场扫描(慢)</button>
+        <button class="ctrlbtn" data-rankscope="all">全市场·主流美股(~560·慢)</button>
         <i class="ctrlsep"></i><span class="small muted">排序</span>
         <button class="ctrlbtn on" data-ranksort="rec">推荐分</button>
         <button class="ctrlbtn" data-ranksort="buy">买点</button>
@@ -352,9 +353,28 @@
         <button class="btn small" data-rankrefresh="1" style="margin-left:auto">↻ 重新扫描</button>
         <span class="tag" id="rankCount"></span>
       </div>
-      <div class="small muted" style="margin-top:6px">⚠️ <b>描述性排序、非涨跌预测</b>：推荐分 = 买点(便宜+在涨)×0.6 + 潜力(上行空间)×0.4。回测显示这类评分对短期≈无预测力、对长期仅弱相关——只当<b>初筛线索</b>，务必看个股详情、自己判断、控仓止损。买入区间由技术支撑(均线/20日低)推算、非保证。</div>
+      <div class="small muted" style="margin-top:6px">⚠️ <b>描述性排序、非涨跌预测</b>：推荐分 = 买点(便宜+在涨)×0.6 + 潜力(上行空间)×0.4 —— 此 60/40 配比已用 <b>6年×112只回测校准</b>(正是长线最优、IC≈0.08；短线≈不可预测)。只当<b>初筛线索</b>，务必看个股详情、自己判断、控仓止损。买入区间由技术支撑(均线/20日低)推算、非保证。</div>
     </div>
     <div id="rankList" class="panel scrolly" style="flex:1 1 auto;min-height:0"><div class="muted small" style="padding:8px">切到本页或点"重新扫描"生成排名。</div></div>
+  </section>
+
+  <!-- ===================== 交易策略 ===================== -->
+  <section id="strategy">
+    <div class="panel" style="flex:0 0 auto">
+      <h3 style="margin-bottom:6px">🎛️ 交易策略 <span class="tag">桶配比 + 板块对冲 + 个股进出场计划（参考·非投资建议）</span></h3>
+      <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
+        <span class="small muted">风格</span>
+        <button class="ctrlbtn" data-stratstyle="conservative">保守</button>
+        <button class="ctrlbtn on" data-stratstyle="balanced">平衡</button>
+        <button class="ctrlbtn" data-stratstyle="aggressive">进取</button>
+        <i class="ctrlsep"></i><span class="small muted">基于</span>
+        <button class="ctrlbtn on" data-stratbase="port">我的持仓</button>
+        <button class="ctrlbtn" data-stratbase="watch">观察+重点</button>
+        <button class="btn small" data-stratrefresh="1" style="margin-left:auto">↻ 重算</button>
+      </div>
+      <div class="small muted" style="margin-top:6px">⚠️ 全部为<b>参考框架、非投资建议</b>。桶/板块目标是风险分散的一般性区间；买入区间、目标价、分批计划由技术面(均线/52周/支撑)推算、非保证。详细参数可在「我的持仓 → 配置优化」自行调。</div>
+    </div>
+    <div id="stratBody" class="panel scrolly" style="flex:1 1 auto;min-height:0"><div class="muted small" style="padding:8px">切到本页生成策略参考。</div></div>
   </section>
 
   <!-- ===================== NEWS ===================== -->
@@ -3113,13 +3133,15 @@ document.addEventListener('click',e=>{
    🏆 推荐排名：扫描系统已知的票，按"现在适合买"(买点×0.6 + 潜力×0.4)排序，给建议买入区间。
    描述性初筛，非涨跌预测(回测：短期≈无预测力)。
    ================================================================= */
+// 主流可买美股池 = S&P500 + 纳指100 + 热门ADR(2026-06联网取最新成分，Yahoo格式)。约560只去重，覆盖散户实际能买的绝大多数。
+const US_UNIVERSE=("MMM AOS ABT ABBV ACN ADBE AMD AES AFL A APD ABNB AKAM ALB ARE ALGN ALLE LNT ALL GOOGL GOOG MO AMZN AMCR AEE AEP AXP AIG AMT AWK AMP AME AMGN APH ADI AON APA APO AAPL AMAT APP APTV ACGL ADM ARES ANET AJG AIZ T ATO ADSK ADP AZO AVB AVY AXON BKR BALL BAC BAX BDX BRK-B BBY TECH BIIB BLK BX XYZ BNY BA BKNG BSX BMY AVGO BR BRO BF-B BLDR BG BXP CHRW CDNS CPT CPB COF CAH CCL CARR CVNA CASY CAT CBOE CBRE CDW COR CNC CNP CF CRL SCHW CHTR CVX CMG CB CHD CIEN CI CINF CTAS CSCO C CFG CLX CME CMS KO CTSH COHR COIN CL CMCSA FIX CAG COP ED STZ CEG COO CPRT GLW CPAY CTVA CSGP COST CRH CRWD CCI CSX CMI CVS DHR DRI DDOG DVA DECK DE DELL DAL DVN DXCM FANG DLR DG DLTR D DPZ DASH DOV DOW DHI DTE DUK DD ETN EBAY SATS ECL EIX EW EA ELV EME EMR ETR EOG EQT EFX EQIX EQR ERIE ESS EL EG EVRG ES EXC EXE EXPE EXPD EXR XOM FFIV FDS FICO FAST FRT FDX FIS FITB FSLR FE FISV F FTNT FTV FOXA FOX BEN FCX GRMN IT GE GEHC GEV GEN GNRC GD GIS GM GPC GILD GPN GL GDDY GS HAL HIG HAS HCA DOC HSIC HSY HPE HLT HD HON HRL HST HWM HPQ HUBB HUM HBAN HII IBM IEX IDXX ITW INCY IR PODD INTC IBKR ICE IFF IP INTU ISRG IVZ INVH IQV IRM JBHT JBL JKHY J JNJ JCI JPM KVUE KDP KEY KEYS KMB KIM KMI KKR KLAC KHC KR LHX LH LRCX LVS LDOS LEN LII LLY LIN LYV LMT L LOW LULU LITE LYB MTB MPC MAR MLM MAS MA MKC MCD MCK MDT MRK META MET MTD MGM MCHP MU MSFT MAA MRNA TAP MDLZ MPWR MNST MCO MS MOS MSI MSCI NDAQ NTAP NFLX NEM NWSA NWS NEE NKE NI NDSN NSC NTRS NOC NCLH NRG NUE NVDA NVR NXPI ORLY OXY ODFL OMC ON OKE ORCL OTIS PCAR PKG PLTR PANW PSKY PH PAYX PYPL PNR PEP PFE PCG PM PSX PNW PNC POOL PPG PPL PFG PG PGR PLD PRU PEG PTC PSA PHM PWR QCOM DGX RL RJF RTX O REG REGN RF RSG RMD RVTY HOOD ROK ROL ROP ROST RCL SPGI CRM SNDK SBAC SLB STX SRE NOW SHW SPG SWKS SJM SW SNA SOLV SO LUV SWK SBUX STT STLD STE SYK SMCI SYF SNPS SYY TMUS TROW TTWO TPR TRGP TGT TEL TDY TER TSLA TXN TPL TXT TMO TJX TKO TTD TSCO TT TDG TRV TRMB TFC TYL TSN USB UBER UDR ULTA UNP UAL UPS URI UNH UHS VLO VEEV VTR VLTO VRSN VRSK VZ VRTX VRT VTRS VICI V VST VMC WRB GWW WAB WMT DIS WBD WM WAT WEC WFC WELL WST WDC WY WSM WMB WTW WDAY WYNN XEL XYL YUM ZBRA ZBH ZTS ALNY ARM ASML CCEP FER INSM MELI MSTR PDD TRI ZS BABA JD BIDU NIO LI XPEV BEKE TME TCOM SE GRAB NU STNE PAGS VALE ITUB BBD TSM NVO SAP TM SONY UL BP SHEL AZN NVS HSBC RIO BHP").split(/\s+/);
 let rankScope='mine', rankSort='rec', rankOnlyGood=false, _rankOk=[];
 function rankUniverse(scope){
   const set=new Set();
   WATCH.forEach(w=>set.add(w.ticker));
   (PORT.positions||[]).forEach(p=>set.add(p.ticker));
   if(typeof GURUS!=='undefined') GURUS.forEach(g=>g.h.forEach(x=>{ if(!x[3]) set.add(x[0]); }));
-  if(scope==='all'){ for(const k in THEMES){ const t=THEMES[k]; if(t.tickers) t.tickers.forEach(tk=>set.add(tk)); } }
+  if(scope==='all'){ for(const k in THEMES){ const t=THEMES[k]; if(t.tickers) t.tickers.forEach(tk=>set.add(tk)); } US_UNIVERSE.forEach(tk=>set.add(tk)); }
   return [...new Set([...set].filter(Boolean).map(normTk))];
 }
 /* 建议买入区间：用技术支撑(均线/20日低)推算，非价格预测 */
@@ -3132,12 +3154,12 @@ function buyZone(m){
   if(b.lvl==='合适') zone=`现价 $${fmt(price,2)} 可分批；回踩 $${fmt(near,2)} 加`;
   else if(b.lvl==='一般') zone=`等回踩 $${fmt(near,2)} 附近再分批更稳`;
   else zone=`暂不追，观望；深跌破 $${fmt(near,2)} 再评估`;
-  return {zone,stop};
+  return {zone,stop,near};
 }
 async function loadRank(){
   const list=document.getElementById('rankList'); if(!list)return;
   const uni=rankUniverse(rankScope);
-  list.innerHTML=`<div class="muted small" style="padding:8px">正在评估 ${uni.length} 只股票的买点/潜力…(${rankScope==='all'?'全市场较慢，约30秒':'约10–20秒'})</div>`;
+  list.innerHTML=`<div class="muted small" style="padding:8px">正在评估 ${uni.length} 只股票的买点/潜力…(${rankScope==='all'?'全市场约560+只、需约1–1.5分钟，请稍候':'约10–20秒'})</div>`;
   const rows=await mapLimit(uni, 10, async tk=>{
     try{ const d=await yahoo(tk,'1y','1d'); if(!d.closes||d.closes.length<40)return null;
       const m=computeStock(d.meta,d.closes,null,d.v);
@@ -3181,6 +3203,88 @@ document.addEventListener('click',e=>{
   const rf=e.target.closest('[data-rankrefresh]'); if(rf){ loadRank(); return; }
   const rt=e.target.closest('#rankList [data-ranktk]'); if(rt){ e.preventDefault(); const tk=rt.dataset.ranktk; $('#stkInput').value=tk; openTab('stock'); analyzeStock(tk); return; }
 });
+/* =================================================================
+   🎛️ 交易策略：① 桶配比(安全/ETF/潜力) ② 板块对冲 ③ 个股进出场计划。参考框架、非投资建议。
+   ================================================================= */
+const STRAT_BUCKETS={conservative:{safe:70,etf:20,growth:10,label:'保守'},balanced:{safe:50,etf:25,growth:25,label:'平衡'},aggressive:{safe:35,etf:15,growth:50,label:'进取'}};
+let stratStyle='balanced', stratBase='port';
+function isETF(tk){ const s=sectorOf(tk); return /ETF|债券|黄金/.test(s) || ['VOO','SPY','IVV','VTI','QQQ','DIA','IWM','ARKK','SCHD','VIG','RSP','EWZ','EWY'].includes(tk) || /^XL[A-Z]$/.test(tk); }
+function bucketOf(tk,vol){ if(isETF(tk))return 'etf'; if(vol!=null&&vol>=0.45)return 'growth'; return 'safe'; }
+async function loadStrategy(){
+  const body=document.getElementById('stratBody'); if(!body)return;
+  body.innerHTML='<div class="muted small" style="padding:8px">计算策略参考中…</div>';
+  let items=[];
+  if(stratBase==='port' && PORT.positions.length){
+    await fetchOptPrices(PORT.positions.map(p=>p.ticker));
+    const tot=PORT.positions.reduce((a,p)=>a+(_priceOf(p.ticker)||0)*p.shares,0)||1;
+    items=PORT.positions.map(p=>({tk:normTk(p.ticker), w:(_priceOf(p.ticker)||0)*p.shares/tot*100}));
+  } else {
+    const tks=[...new Set(WATCH.map(w=>normTk(w.ticker)))];
+    if(!tks.length){ body.innerHTML='<div class="note" style="margin:8px">没有持仓/关注。先在「我的持仓」录入，或切到「观察+重点」。</div>'; return; }
+    items=tks.map(tk=>({tk, w:100/tks.length}));
+  }
+  const rows=await Promise.all(items.map(async it=>{
+    try{ const d=await yahoo(it.tk,'1y','1d'); if(!d.closes||d.closes.length<40)return null;
+      const m=computeStock(d.meta,d.closes,null,d.v); return {...it, m, bucket:bucketOf(it.tk,m.vol), sector:sectorOf(it.tk)};
+    }catch(e){ return null; }
+  }));
+  const ok=rows.filter(Boolean);
+  if(!ok.length){ body.innerHTML='<div class="note" style="margin:8px">取数失败，点"重算"重试。</div>'; return; }
+  body.innerHTML = stratBuckets(ok) + stratSectors(ok) + stratPlans(ok);
+}
+function stratBuckets(ok){
+  const T=STRAT_BUCKETS[stratStyle], cur={safe:0,etf:0,growth:0};
+  ok.forEach(r=>cur[r.bucket]+=r.w);
+  const map=[['safe','🛡️ 安全大股 (蓝筹/低波动)',T.safe],['etf','📊 基金 / ETF',T.etf],['growth','🚀 潜力小股 (高波动成长)',T.growth]];
+  const rows=map.map(([k,lab,tgt])=>{
+    const c=cur[k], diff=tgt-c, near=Math.abs(diff)<3;
+    const tip=near?'≈达标':(diff>0?`建议+${fmt(diff,0)}%`:`建议-${fmt(-diff,0)}%`);
+    const col=near?'#3fb950':(Math.abs(diff)<12?'#d29922':'#f85149');
+    const names=ok.filter(r=>r.bucket===k).map(r=>r.tk).join(' ')||'—';
+    return `<div class="panel sig" style="margin-bottom:6px">
+      <div class="top"><span class="name">${lab}</span><span class="small">当前 <b>${fmt(c,0)}%</b> → 目标 ${tgt}% · <b style="color:${col}">${tip}</b></span></div>
+      <div class="gauge" style="height:6px;margin-top:4px"><i style="width:${Math.min(c,100)}%;background:${col}"></i></div>
+      <div class="small muted" style="margin-top:3px">${names}</div></div>`;
+  }).join('');
+  return `<h3 style="font-size:13px;margin:4px 2px 6px">① 持仓桶配比 · <span style="color:var(--accent)">${T.label}</span>风格</h3>${rows}
+    <div class="small muted" style="margin:2px 2px 12px">按<b>年化波动</b>自动归类(ETF / 低波动蓝筹&lt;45% / 高波动成长≥45%)。目标=风险分散的一般区间，上方切风格调整。</div>`;
+}
+function stratSectors(ok){
+  const sec={}; ok.forEach(r=>{ const s=r.sector; (sec[s]=sec[s]||{w:0,sc:0,vol:0,n:0}); sec[s].w+=r.w; sec[s].sc+=r.m.Final; sec[s].vol+=r.m.vol; sec[s].n++; });
+  const arr=Object.entries(sec).map(([s,v])=>({s,w:v.w,sc:Math.round(v.sc/v.n),vol:v.vol/v.n})).sort((a,b)=>b.w-a.w);
+  const top=arr[0];
+  const warn=(top&&top.w>40)?`<div class="small" style="color:var(--amber);margin-bottom:4px">⚠️ <b>${top.s}</b> 占 ${fmt(top.w,0)}% — 集中度偏高，同涨同跌、回撤会放大。考虑加入相关性低的板块/防御资产(大盘ETF/黄金/公用)对冲。</div>`:'<div class="small muted" style="margin-bottom:4px">板块分布较均衡。</div>';
+  const rows=arr.map(a=>{
+    const rc=a.sc>=58?'#3fb950':(a.sc>=45?'#d29922':'#6e7681'), vc=a.vol>=0.6?'#f85149':(a.vol>=0.4?'#d29922':'#3fb950');
+    return `<div class="news-item" style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+      <span style="min-width:130px"><b>${a.s}</b></span>
+      <span class="small">仓位 <b>${fmt(a.w,0)}%</b></span>
+      <span class="small">潜力 <b style="color:${rc}">${a.sc}</b></span>
+      <span class="small">风险(波动) <b style="color:${vc}">${pct(a.vol*100,0)}</b></span></div>`;
+  }).join('');
+  return `<h3 style="font-size:13px;margin:4px 2px 6px">② 板块暴露 / 对冲</h3>${warn}${rows}
+    <div class="small muted" style="margin:4px 2px 12px">按「个股分析」的板块归类；潜力=该板块持仓平均综合分，风险=平均年化波动。集中在单一板块=同涨同跌、回撤大；分散到低相关板块可降波动。</div>`;
+}
+function stratPlans(ok){
+  const rows=ok.slice().sort((a,b)=>b.w-a.w).map(r=>{
+    const m=r.m, pos=m.pos52;
+    const loc=pos==null?'—':(pos<0.34?'低位':(pos<0.67?'中位':'高位')), locCol=pos==null?'#8b949e':(pos<0.34?'#3fb950':(pos<0.67?'#d29922':'#f85149'));
+    const z=buyZone(m), pot=potentialOf(m), tgt=m.hi52, deeper=(z.near||m.price*0.95)*0.95;
+    return `<div class="panel sig" style="margin-bottom:6px">
+      <div class="top"><span class="name">${r.tk} <span class="muted small" style="font-weight:400">仓位 ${fmt(r.w,0)}% · $${fmt(m.price,2)}</span></span>
+        <span class="small">位置 <b style="color:${locCol}">${loc}</b>${pos!=null?` (${fmt(pos*100,0)}% 52周区间)`:''}</span></div>
+      <div class="small" style="color:var(--accent)">💵 买入区间：${z.zone} · 参考止损 $${fmt(z.stop,2)}</div>
+      <div class="small">🎯 目标(52周高参考)：$${fmt(tgt,2)}${pot.up!=null?` · 上行 <b style="color:${pot.color}">${pot.up>=0?'+':''}${fmt(pot.up,0)}%</b>`:''}</div>
+      <div class="small muted">分批：建仓 现价$${fmt(m.price,2)} / 回踩$${fmt(z.near||m.price,2)} / 深跌$${fmt(deeper,2)} 各约⅓；出仓 近目标$${fmt(tgt,2)}分批减、跌破止损$${fmt(z.stop,2)}清。</div></div>`;
+  }).join('');
+  return `<h3 style="font-size:13px;margin:4px 2px 6px">③ 个股进出场计划</h3>${rows}
+    <div class="small muted" style="margin:4px 2px 8px">位置=现价在52周区间的位置(低位偏机会/高位偏谨慎)；买区/止损/支撑由均线与20日低推算；目标暂用52周高(填 FMP/Finnhub key 可换投行目标)。<b>均为参考、非保证，分批与止损请按自己风险承受度定。</b></div>`;
+}
+document.addEventListener('click',e=>{
+  const ss=e.target.closest('[data-stratstyle]'); if(ss){ stratStyle=ss.dataset.stratstyle; document.querySelectorAll('[data-stratstyle]').forEach(b=>b.classList.toggle('on',b===ss)); loadStrategy(); return; }
+  const sb=e.target.closest('[data-stratbase]'); if(sb){ stratBase=sb.dataset.stratbase; document.querySelectorAll('[data-stratbase]').forEach(b=>b.classList.toggle('on',b===sb)); loadStrategy(); return; }
+  const sr=e.target.closest('[data-stratrefresh]'); if(sr){ loadStrategy(); return; }
+});
 function refreshTab(tab, force){
   if(!tab)return;
   const now=Date.now();
@@ -3194,6 +3298,7 @@ function refreshTab(tab, force){
   else if(tab==='chain'){ renderChainNav(); showChainSegment(curChain||CHAINS[0].id); }
   else if(tab==='gurus'){ renderGuruNav(); showGuru(curGuru||GURUS[0].id); }
   else if(tab==='rank'){ if(_rankOk.length) renderRankList(); else loadRank(); }
+  else if(tab==='strategy') loadStrategy();
   else if(tab==='myk') renderMyKlines();
   else if(tab==='bloggers') loadBloggers();
 }
