@@ -167,17 +167,17 @@
 <header>
   <div class="brand"><span class="logo">📈</span>美股参考台<span class="clock" id="clock"></span><span class="clock" id="buildTag" style="opacity:.6"></span></div>
   <nav class="tabs" id="tabs">
-    <button class="tab" data-tab="dash">📊 市场监控</button>
-    <button class="tab" data-tab="stock">🔎 个股分析</button>
-    <button class="tab" data-tab="chain">🔗 产业链</button>
-    <button class="tab" data-tab="gurus">🧑‍💼 名人持仓</button>
-    <button class="tab" data-tab="rank">🏆 推荐排名</button>
-    <button class="tab" data-tab="strategy">🎛️ 交易策略</button>
-    <button class="tab active" data-tab="market">🌐 市场动向</button>
-    <button class="tab" data-tab="news">📰 全球新闻</button>
-    <button class="tab" data-tab="bloggers">📡 博主追踪</button>
     <button class="tab" data-tab="port">💼 我的持仓</button>
     <button class="tab" data-tab="myk">📈 我的K线</button>
+    <button class="tab" data-tab="strategy">🎛️ 交易策略</button>
+    <button class="tab" data-tab="stock">🔎 个股分析</button>
+    <button class="tab" data-tab="chain">🔗 产业链</button>
+    <button class="tab active" data-tab="market">🌐 市场动向</button>
+    <button class="tab" data-tab="dash">📊 市场监控</button>
+    <button class="tab" data-tab="news">📰 全球新闻</button>
+    <button class="tab" data-tab="bloggers">📡 博主追踪</button>
+    <button class="tab" data-tab="gurus">🧑‍💼 名人持仓</button>
+    <button class="tab" data-tab="rank">🏆 推荐排名</button>
   </nav>
   <div class="actions">
     <div class="status" id="srcStatus"></div>
@@ -3836,7 +3836,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260618-2130';
+const BUILD='20260618-2200';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
