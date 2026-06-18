@@ -363,16 +363,19 @@
     <div class="panel" style="flex:0 0 auto">
       <h3 style="margin-bottom:6px">🎛️ 交易策略 <span class="tag">桶配比 + 板块对冲 + 个股进出场计划（参考·非投资建议）</span></h3>
       <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center">
-        <span class="small muted">风格</span>
+        <span class="small muted">模式</span>
+        <button class="ctrlbtn on" data-stratmode="checkup">📋 持仓体检</button>
+        <button class="ctrlbtn" data-stratmode="sizer">🧮 配比助手</button>
+        <i class="ctrlsep"></i><span class="small muted">风格</span>
         <button class="ctrlbtn" data-stratstyle="conservative">保守</button>
         <button class="ctrlbtn on" data-stratstyle="balanced">平衡</button>
         <button class="ctrlbtn" data-stratstyle="aggressive">进取</button>
-        <i class="ctrlsep"></i><span class="small muted">基于</span>
+        <span data-stratonly="checkup"><i class="ctrlsep"></i><span class="small muted">基于</span>
         <button class="ctrlbtn on" data-stratbase="port">我的持仓</button>
-        <button class="ctrlbtn" data-stratbase="watch">观察+重点</button>
+        <button class="ctrlbtn" data-stratbase="watch">观察+重点</button></span>
         <button class="btn small" data-stratrefresh="1" style="margin-left:auto">↻ 重算</button>
       </div>
-      <div class="small muted" style="margin-top:6px">⚠️ 全部为<b>参考框架、非投资建议</b>。桶/板块目标是风险分散的一般性区间；买入区间、目标价、分批计划由技术面(均线/52周/支撑)推算、非保证。详细参数可在「我的持仓 → 配置优化」自行调。</div>
+      <div class="small muted" style="margin-top:6px">⚠️ 全部为<b>参考框架、非投资建议</b>。<b>持仓体检</b>=看你现有持仓的桶/板块/个股计划；<b>配比助手</b>=你把挑好的票填进三个桶，自动算各自该多少仓位%。算法透明(反波动率/评分/等权)、非黑箱AI、非保证，详细参数可自调。</div>
     </div>
     <div id="stratBody" class="panel scrolly" style="flex:1 1 auto;min-height:0"><div class="muted small" style="padding:8px">切到本页生成策略参考。</div></div>
   </section>
@@ -3237,11 +3240,14 @@ document.addEventListener('click',e=>{
    🎛️ 交易策略：① 桶配比(安全/ETF/潜力) ② 板块对冲 ③ 个股进出场计划。参考框架、非投资建议。
    ================================================================= */
 const STRAT_BUCKETS={conservative:{safe:70,etf:20,growth:10,label:'保守'},balanced:{safe:50,etf:25,growth:25,label:'平衡'},aggressive:{safe:35,etf:15,growth:50,label:'进取'}};
-let stratStyle='balanced', stratBase='port';
+let stratStyle='balanced', stratBase='port', stratMode='checkup';
+let SIZER=load('sizer',{safe:'',etf:'',growth:'',method:'invvol',cap:''});
 function isETF(tk){ const s=sectorOf(tk); return /ETF|债券|黄金/.test(s) || ['VOO','SPY','IVV','VTI','QQQ','DIA','IWM','ARKK','SCHD','VIG','RSP','EWZ','EWY'].includes(tk) || /^XL[A-Z]$/.test(tk); }
 function bucketOf(tk,vol){ if(isETF(tk))return 'etf'; if(vol!=null&&vol>=0.45)return 'growth'; return 'safe'; }
 async function loadStrategy(){
   const body=document.getElementById('stratBody'); if(!body)return;
+  document.querySelectorAll('[data-stratonly]').forEach(el=>el.style.display = el.dataset.stratonly===stratMode?'':'none');
+  if(stratMode==='sizer'){ renderSizer(); return; }
   body.innerHTML='<div class="muted small" style="padding:8px">计算策略参考中…</div>';
   let items=[];
   if(stratBase==='port' && PORT.positions.length){
@@ -3310,7 +3316,65 @@ function stratPlans(ok){
   return `<h3 style="font-size:13px;margin:4px 2px 6px">③ 个股进出场计划</h3>${rows}
     <div class="small muted" style="margin:4px 2px 8px">位置=现价在52周区间的位置(低位偏机会/高位偏谨慎)；买区/止损/支撑由均线与20日低推算；目标暂用52周高(填 FMP/Finnhub key 可换投行目标)。<b>均为参考、非保证，分批与止损请按自己风险承受度定。</b></div>`;
 }
+/* 🧮 配比助手：你把挑好的票填进三个桶，按桶目标%+桶内权重(反波动率/评分/等权)算每只该多少仓位。透明算法、非LLM、非投资建议。 */
+function renderSizer(){
+  const body=document.getElementById('stratBody'); if(!body)return;
+  const T=STRAT_BUCKETS[stratStyle], meth=SIZER.method||'invvol';
+  const mb=(k,l)=>`<button class="ctrlbtn${meth===k?' on':''}" data-sizermethod="${k}">${l}</button>`;
+  body.innerHTML=`<div class="panel sig" style="margin-bottom:8px">
+    <div class="small muted" style="margin-bottom:6px">把挑好的票按桶填进去(空格/逗号分隔)，点「计算配比」。桶目标比例跟随上方<b>${T.label}</b>风格：安全 ${T.safe}% / ETF ${T.etf}% / 潜力 ${T.growth}%(改风格即变)。</div>
+    <div style="display:grid;gap:7px">
+      <label class="fld">🛡️ 安全大股(蓝筹/低波动) · 目标 ${T.safe}% <input id="sz_safe" value="${SIZER.safe||''}" placeholder="如 MSFT GOOGL AAPL META" style="text-transform:uppercase"></label>
+      <label class="fld">📊 基金/ETF · 目标 ${T.etf}% <input id="sz_etf" value="${SIZER.etf||''}" placeholder="如 VOO QQQ" style="text-transform:uppercase"></label>
+      <label class="fld">🚀 潜力小股(高波动成长) · 目标 ${T.growth}% <input id="sz_growth" value="${SIZER.growth||''}" placeholder="如 AAOI AXTI RKLB CRCL" style="text-transform:uppercase"></label>
+    </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
+      <span class="small muted">桶内权重</span>${mb('invvol','反波动率·控风险(推荐)')}${mb('score','评分加权·偏强势')}${mb('equal','等权')}
+      <i class="ctrlsep"></i><span class="small muted">总资金$(选填)</span><input id="sz_cap" type="number" value="${SIZER.cap||''}" placeholder="如 1100" style="width:100px">
+      <button class="btn primary small" data-sizergo="1" style="margin-left:auto">🧮 计算配比</button>
+    </div></div>
+    <div id="sizerResult"><div class="muted small" style="padding:6px">填好三个桶 → 点「计算配比」。</div></div>`;
+  if(SIZER.safe||SIZER.etf||SIZER.growth) computeSizer();
+}
+async function computeSizer(){
+  const g=id=>(document.getElementById(id)||{}).value||'';
+  SIZER.safe=g('sz_safe'); SIZER.etf=g('sz_etf'); SIZER.growth=g('sz_growth'); SIZER.cap=g('sz_cap'); save('sizer',SIZER);
+  const out=document.getElementById('sizerResult'); if(!out)return;
+  const T=STRAT_BUCKETS[stratStyle], meth=SIZER.method||'invvol', cap=parseFloat(SIZER.cap)||0;
+  const parse=s=>[...new Set((s||'').toUpperCase().split(/[^A-Z0-9.\-]+/).filter(Boolean).map(normTk))];
+  let buckets=[{key:'safe',lab:'🛡️安全',tgt:T.safe,tks:parse(SIZER.safe)},{key:'etf',lab:'📊ETF',tgt:T.etf,tks:parse(SIZER.etf)},{key:'growth',lab:'🚀潜力',tgt:T.growth,tks:parse(SIZER.growth)}].filter(b=>b.tks.length);
+  if(!buckets.length){ out.innerHTML='<div class="note" style="margin:6px">三个桶都空着——先填几只票。</div>'; return; }
+  out.innerHTML='<div class="muted small" style="padding:6px">抓实时数据、计算配比中…</div>';
+  const tsum=buckets.reduce((a,b)=>a+b.tgt,0)||1; buckets.forEach(b=>b.adj=b.tgt/tsum*100);   // 空桶比例分给有票的桶
+  const all=[...new Set(buckets.flatMap(b=>b.tks))], data={};
+  await Promise.all(all.map(async tk=>{ try{ const d=await yahoo(tk,'1y','1d'); if(d.closes&&d.closes.length>=40){ const m=computeStock(d.meta,d.closes,null,d.v); data[tk]={price:m.price,vol:m.vol||0.5,fin:m.Final,buy:buyPointOf(m).lvl}; } }catch(e){} }));
+  let rows=[], failed=[];
+  buckets.forEach(b=>{ const ok=b.tks.filter(t=>data[t]); b.tks.filter(t=>!data[t]).forEach(t=>failed.push(t)); if(!ok.length)return;
+    const wOf=t=>{ const d=data[t]; return meth==='equal'?1:(meth==='score'?Math.max(1,d.fin):1/Math.max(0.08,d.vol)); };
+    const ws=ok.map(wOf), sum=ws.reduce((a,x)=>a+x,0)||1;
+    ok.forEach((t,i)=>rows.push({tk:t,bucket:b.lab,pct:b.adj*ws[i]/sum,...data[t]})); });
+  rows.sort((a,b)=>b.pct-a.pct);
+  const wVol=rows.reduce((a,r)=>a+r.pct/100*r.vol,0), lev=rows.filter(r=>LEV_ETF.includes(r.tk)).reduce((a,r)=>a+r.pct,0), maxR=rows[0];
+  const col=`1fr 60px 66px 56px${cap?' 92px':''}`;
+  const head=`<div style="display:grid;grid-template-columns:${col};gap:4px;font-size:11px;color:var(--muted);padding:0 2px 4px"><span>票 · 桶</span><span style="text-align:right">建议%</span><span style="text-align:right">波动/分</span><span style="text-align:right">买点</span>${cap?'<span style="text-align:right">≈钱/股</span>':''}</div>`;
+  const body2=rows.map(r=>{ const amt=cap?cap*r.pct/100:0, sh=amt&&r.price?amt/r.price:0, bc=r.buy==='合适'?'#3fb950':(r.buy==='一般'?'#d29922':'#f85149');
+    return `<div style="display:grid;grid-template-columns:${col};gap:4px;align-items:center;padding:4px 2px;border-bottom:1px solid var(--border)">
+      <span><a href="#" data-stk="${r.tk}" style="color:var(--text);font-weight:700">${r.tk}</a> <span class="muted small">${r.bucket}</span></span>
+      <span style="text-align:right;font-weight:700;color:var(--accent)">${fmt(r.pct,1)}%</span>
+      <span style="text-align:right" class="small muted">${pct(r.vol*100,0)}/${r.fin}</span>
+      <span style="text-align:right;color:${bc}" class="small">${r.buy}</span>
+      ${cap?`<span style="text-align:right" class="small muted">$${fmt(amt,0)}/${fmt(sh,sh<10?2:0)}</span>`:''}</div>`; }).join('');
+  out.innerHTML=`<div class="panel sig"><div class="top"><span class="name">🧮 建议仓位配比 <span class="muted small">${meth==='invvol'?'反波动率':meth==='score'?'评分加权':'等权'}·${T.label}</span></span><span class="small">合计 <b>${fmt(rows.reduce((a,r)=>a+r.pct,0),0)}%</b></span></div>
+    ${head}${body2}
+    <div class="small muted" style="margin-top:6px">加权年化波动 <b>${pct(wVol*100,0)}</b>${lev>0?` · ⚠️杠杆ETF ${fmt(lev,0)}%(每日复利衰减)`:''}${maxR&&maxR.pct>30?` · ⚠️最大单仓 ${maxR.tk} ${fmt(maxR.pct,0)}%偏集中`:''}${cap?` · 总资金 $${fmt(cap,0)}`:''}</div>
+    ${failed.length?`<div class="small" style="color:var(--amber);margin-top:4px">取数失败(非美股/代码错)：${failed.join('、')} —— 未计入</div>`:''}
+    <div class="small muted" style="margin-top:4px">桶内默认<b>反波动率</b>(波动越低权重越高、控风险)，可切评分加权/等权；空桶比例已按比例分给有票的桶。<b>透明算法·参考·非投资建议</b>，自行判断、控仓止损。</div></div>`;
+}
 document.addEventListener('click',e=>{
+  const sm=e.target.closest('[data-stratmode]'); if(sm){ stratMode=sm.dataset.stratmode; document.querySelectorAll('[data-stratmode]').forEach(b=>b.classList.toggle('on',b===sm)); loadStrategy(); return; }
+  const sme=e.target.closest('[data-sizermethod]'); if(sme){ SIZER.method=sme.dataset.sizermethod; save('sizer',SIZER); document.querySelectorAll('[data-sizermethod]').forEach(b=>b.classList.toggle('on',b===sme)); computeSizer(); return; }
+  const sg=e.target.closest('[data-sizergo]'); if(sg){ computeSizer(); return; }
+  const sk=e.target.closest('#strategy [data-stk]'); if(sk){ e.preventDefault(); $('#stkInput').value=sk.dataset.stk; openTab('stock'); analyzeStock(sk.dataset.stk); return; }
   const ss=e.target.closest('[data-stratstyle]'); if(ss){ stratStyle=ss.dataset.stratstyle; document.querySelectorAll('[data-stratstyle]').forEach(b=>b.classList.toggle('on',b===ss)); loadStrategy(); return; }
   const sb=e.target.closest('[data-stratbase]'); if(sb){ stratBase=sb.dataset.stratbase; document.querySelectorAll('[data-stratbase]').forEach(b=>b.classList.toggle('on',b===sb)); loadStrategy(); return; }
   const sr=e.target.closest('[data-stratrefresh]'); if(sr){ loadStrategy(); return; }
