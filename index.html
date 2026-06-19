@@ -481,7 +481,7 @@
           <span class="tag" id="pnlSummary" style="margin-left:8px"></span>
         </div>
         <div id="pnlCal"><div class="muted small">打开/刷新持仓后自动生成…</div></div>
-        <div class="small muted" style="margin-top:8px">说明：<b>只从你的买入/记录日开始记</b>——买入<b>之前不持有</b>所以空白；<b>买入当天</b>=成本价→当天收盘的涨跌；<b>之后每天</b>=昨收→今收。每过一个交易日自动补一格。想补看更早的真实走势：在持仓那行点 <b>✎</b> 填上真实「买入日期」即可回填。当月汇总=各持有交易日复利。</div>
+        <div class="small muted" style="margin-top:8px">说明：<b>只从你的买入/记录日开始记</b>——买入<b>之前不持有</b>所以空白；<b>买入当天</b>=成本价→当天收盘的涨跌；<b>之后每天</b>=昨收→今收。每过一个交易日自动补一格。想补看更早的真实走势：在持仓那行点 <b>✎</b> 填上真实「买入日期」即可回填。当月汇总=各持有交易日复利。<br><b>加密币(如 BTC)24/7</b>：持有加密币时<b>周末/节假日也照常记一格</b>（那天只有币在动）；今天这格随价格<b>实时刷新</b>、跨到明天就<b>定格</b>；<b>永不显示未来日</b>。纯股票则只记交易日(周末/节假日空白)。</div>
       </div>
       </div>
     </div>
@@ -1536,12 +1536,16 @@ let priceCache={}; // ticker -> {price,prev,hi,lo,ma200,rsi14}
    之后每天=昨收→今收。多只票按当天市值加权成组合每日%。数据来自 refreshPrices 已抓的日线(零额外请求)。 */
 let _pnlData=null, _pnlMonthOff=0;
 function _tsDate(ts){ const d=new Date(ts*1000); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); }
+function _localToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function buildPnlData(series){   // series: [{p, sh, t, c}]  p=持仓对象(取 cost/since)
   if(!series||!series.length){ _pnlData={}; return; }
   const items=series.map(s=>{ const m={}; for(let i=0;i<s.t.length;i++){ if(s.c[i]!=null) m[_tsDate(s.t[i])]=s.c[i]; } return {p:s.p, sh:s.sh, cost:s.p.cost||0, m, crypto:/-USD$/i.test(s.p.ticker||'')}; });
-  // 日历日期只用「股票真实交易日」：加密币(BTC-USD 等)24/7、按 UTC 跨日，会在周末/节假日(如周五 Juneteenth)凭空多出格子 → 剔除，只让股票决定有哪些交易日(加密币仍按这些交易日参与市值)
-  const stockItems=items.filter(it=>!it.crypto);
-  const allDates=[...new Set((stockItems.length?stockItems:items).flatMap(it=>Object.keys(it.m)))].sort();
+  // 含加密币(BTC-USD 等 24/7)→ 用每一天(周末/节假日也照常算,它真在变)；纯股票→ 只用股票交易日(周末/节假日空白)
+  const hasCrypto=items.some(it=>it.crypto), stockItems=items.filter(it=>!it.crypto);
+  const dateSrc = hasCrypto ? items : (stockItems.length?stockItems:items);
+  let allDates=[...new Set(dateSrc.flatMap(it=>Object.keys(it.m)))].sort();
+  const todayLocal=_localToday();
+  allDates=allDates.filter(d=>d<=todayLocal);   // 永不画"未来日"：BTC 的 UTC 日线傍晚会跳成"明天"(本地还没到)→按本地当天截断(之前周五提前冒出来就是这 bug)
   if(!allDates.length){ _pnlData={}; return; }
   const latest=allDates[allDates.length-1];
   let changed=false;
@@ -4050,7 +4054,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260619-0430';
+const BUILD='20260619-0530';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
