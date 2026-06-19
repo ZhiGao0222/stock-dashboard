@@ -1617,10 +1617,10 @@ async function refreshPrices(){
     try{
       const [yd, lp]=await Promise.all([yahoo(p.ticker,'1y','1d'), livePrice(p.ticker)]);
       const {meta,closes}=yd;
-      if(yd.t&&yd.c&&yd.c.length) _pnlSeries.push({p, sh:p.shares, t:yd.t, c:yd.c, live:price});
       // 真正的"昨收"=倒数第二根日K（meta.chartPreviousClose 是一年前的收盘，不能用）
       const prev = closes.length>=2 ? closes[closes.length-2] : meta.chartPreviousClose;
       const price = lp ?? meta.regularMarketPrice;   // 优先含盘后实时价
+      if(yd.t&&yd.c&&yd.c.length) _pnlSeries.push({p, sh:p.shares, t:yd.t, c:yd.c, live:price});   // ⚠️必须放在 price 定义之后(否则 TDZ ReferenceError→整页持仓全取价失败)
       let z=null; try{ z=zoneFor(p.ticker, computeStock(meta,closes,p.target||null)); }catch(e){}
       priceCache[p.ticker]={
         price, prev,
@@ -1687,9 +1687,10 @@ function renderPort(){
   // 取价失败(最常见=代码打错)→醒目红字警告，并提示账户总值不含它们
   const failedTks = rows.filter(r=>r.c.error).map(r=>r.p.ticker);
   const pw=$('#portWarn');
-  if(pw) pw.innerHTML = failedTks.length
-    ? `<div class="note" style="border-color:var(--red);background:rgba(248,81,73,.12);color:#ffc2bd;margin-bottom:8px;line-height:1.55">⚠️ <b>${failedTks.length} 只取不到行情，多半是代码打错了</b>：<b>${failedTks.join('、')}</b> —— 它们<b>没算进账户总值</b>(所以总值会偏低)。请点该行 <b>✎</b> 改对代码，或用「📋批量粘贴」勾选"覆盖"重录。常见错法：<b>GOOGL≠GOOL · AXTI≠AXTO</b>。</div>`
-    : '';
+  const nPos=PORT.positions.length, systemic = failedTks.length>=Math.max(3, Math.ceil(nPos*0.5));   // 成片失败=数据源问题,不是代码
+  if(pw) pw.innerHTML = !failedTks.length ? '' : (systemic
+    ? `<div class="note" style="border-color:var(--amber);background:rgba(210,153,34,.12);color:#ffe3a3;margin-bottom:8px;line-height:1.55">⏳ <b>${failedTks.length} 只暂时取不到行情（${failedTks.length>=nPos?'全部':'大部分'}）</b> —— 这种"成片失败"<b>基本不是代码问题</b>，多半是数据源(Yahoo/代理)<b>临时限流或网络波动</b>。<b>点「↻ 刷新现价」重试一下</b>通常就好。只有当<b>仅剩个别</b>一直失败时，才按下面查代码。失败：${failedTks.join('、')}</div>`
+    : `<div class="note" style="border-color:var(--red);background:rgba(248,81,73,.12);color:#ffc2bd;margin-bottom:8px;line-height:1.55">⚠️ <b>${failedTks.length} 只取不到行情</b>：<b>${failedTks.join('、')}</b> —— 其它都正常，大概率是<b>这几只代码打错</b>(它们<b>没算进账户总值</b>)。点该行 <b>✎</b> 改对代码，或「📋批量粘贴」覆盖重录。常见错法：<b>GOOGL≠GOOL · AXTI≠AXTO</b>。也可能只是临时抓取失败，可先点「↻ 刷新现价」试一次。</div>`);
 
   // ===== 账户层面盈亏(用户设定锚点)：总盈亏=账户总值−初始资金；今日盈亏=账户总值−昨日收盘账户值 =====
   const cash=Number(PORT.cash)||0;
@@ -4055,7 +4056,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260619-0630';
+const BUILD='20260619-0730';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
