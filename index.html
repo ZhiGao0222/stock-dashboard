@@ -1539,7 +1539,7 @@ function _tsDate(ts){ const d=new Date(ts*1000); return d.getUTCFullYear()+'-'+S
 function _localToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function buildPnlData(series){   // series: [{p, sh, t, c}]  p=持仓对象(取 cost/since)
   if(!series||!series.length){ _pnlData={}; return; }
-  const items=series.map(s=>{ const m={}; for(let i=0;i<s.t.length;i++){ if(s.c[i]!=null) m[_tsDate(s.t[i])]=s.c[i]; } return {p:s.p, sh:s.sh, cost:s.p.cost||0, m, crypto:/-USD$/i.test(s.p.ticker||'')}; });
+  const items=series.map(s=>{ const m={}; for(let i=0;i<s.t.length;i++){ if(s.c[i]!=null) m[_tsDate(s.t[i])]=s.c[i]; } return {p:s.p, sh:s.sh, cost:s.p.cost||0, m, live:s.live, crypto:/-USD$/i.test(s.p.ticker||'')}; });
   // 含加密币(BTC-USD 等 24/7)→ 用每一天(周末/节假日也照常算,它真在变)；纯股票→ 只用股票交易日(周末/节假日空白)
   const hasCrypto=items.some(it=>it.crypto), stockItems=items.filter(it=>!it.crypto);
   const dateSrc = hasCrypto ? items : (stockItems.length?stockItems:items);
@@ -1550,7 +1550,8 @@ function buildPnlData(series){   // series: [{p, sh, t, c}]  p=持仓对象(取 
   const latest=allDates[allDates.length-1];
   let changed=false;
   items.forEach(it=>{
-    it.fc=[]; let last=null; for(const ds of allDates){ if(it.m[ds]!=null) last=it.m[ds]; it.fc.push(last); }   // 前向填充(对齐到股票交易日)
+    it.fc=[]; let last=null; for(const ds of allDates){ if(it.m[ds]!=null) last=it.m[ds]; it.fc.push(last); }   // 前向填充(对齐到交易日)
+    if(it.live!=null && it.fc.length) it.fc[it.fc.length-1]=it.live;   // 最后一天(今天)用实时价,跟"总盈亏/现价/表格"一致(不用滞后的日线收盘)→当日建仓时 当月%==总盈亏%
     if(!it.p.since){ it.p.since=latest; changed=true; }                 // 首次=锚定到最近交易日(=今天)，之后持久
     if(it.p.since>latest){ it.p.since=latest; changed=true; }           // 锚点别落在非交易日(如BTC造成的未来日)→纠回最近交易日
     const since=it.p.since;
@@ -1616,7 +1617,7 @@ async function refreshPrices(){
     try{
       const [yd, lp]=await Promise.all([yahoo(p.ticker,'1y','1d'), livePrice(p.ticker)]);
       const {meta,closes}=yd;
-      if(yd.t&&yd.c&&yd.c.length) _pnlSeries.push({p, sh:p.shares, t:yd.t, c:yd.c});
+      if(yd.t&&yd.c&&yd.c.length) _pnlSeries.push({p, sh:p.shares, t:yd.t, c:yd.c, live:price});
       // 真正的"昨收"=倒数第二根日K（meta.chartPreviousClose 是一年前的收盘，不能用）
       const prev = closes.length>=2 ? closes[closes.length-2] : meta.chartPreviousClose;
       const price = lp ?? meta.regularMarketPrice;   // 优先含盘后实时价
@@ -4054,7 +4055,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260619-0530';
+const BUILD='20260619-0630';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
