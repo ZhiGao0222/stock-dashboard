@@ -1538,15 +1538,18 @@ let _pnlData=null, _pnlMonthOff=0;
 function _tsDate(ts){ const d=new Date(ts*1000); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); }
 function buildPnlData(series){   // series: [{p, sh, t, c}]  p=持仓对象(取 cost/since)
   if(!series||!series.length){ _pnlData={}; return; }
-  const items=series.map(s=>{ const m={}; for(let i=0;i<s.t.length;i++){ if(s.c[i]!=null) m[_tsDate(s.t[i])]=s.c[i]; } return {p:s.p, sh:s.sh, cost:s.p.cost||0, m}; });
-  const allDates=[...new Set(items.flatMap(it=>Object.keys(it.m)))].sort();
+  const items=series.map(s=>{ const m={}; for(let i=0;i<s.t.length;i++){ if(s.c[i]!=null) m[_tsDate(s.t[i])]=s.c[i]; } return {p:s.p, sh:s.sh, cost:s.p.cost||0, m, crypto:/-USD$/i.test(s.p.ticker||'')}; });
+  // 日历日期只用「股票真实交易日」：加密币(BTC-USD 等)24/7、按 UTC 跨日，会在周末/节假日(如周五 Juneteenth)凭空多出格子 → 剔除，只让股票决定有哪些交易日(加密币仍按这些交易日参与市值)
+  const stockItems=items.filter(it=>!it.crypto);
+  const allDates=[...new Set((stockItems.length?stockItems:items).flatMap(it=>Object.keys(it.m)))].sort();
   if(!allDates.length){ _pnlData={}; return; }
   const latest=allDates[allDates.length-1];
   let changed=false;
   items.forEach(it=>{
-    it.fc=[]; let last=null; for(const ds of allDates){ if(it.m[ds]!=null) last=it.m[ds]; it.fc.push(last); }   // 前向填充
+    it.fc=[]; let last=null; for(const ds of allDates){ if(it.m[ds]!=null) last=it.m[ds]; it.fc.push(last); }   // 前向填充(对齐到股票交易日)
     if(!it.p.since){ it.p.since=latest; changed=true; }                 // 首次=锚定到最近交易日(=今天)，之后持久
-    const since=(it.p.since>latest)?latest:it.p.since;
+    if(it.p.since>latest){ it.p.since=latest; changed=true; }           // 锚点别落在非交易日(如BTC造成的未来日)→纠回最近交易日
+    const since=it.p.since;
     let bi=allDates.findIndex(d=>d>=since); if(bi<0) bi=allDates.length-1;
     it.buyIdx=bi;                                                       // 买入日索引(第一个>=since 的交易日)
   });
@@ -4044,7 +4047,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260619-0230';
+const BUILD='20260619-0330';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
