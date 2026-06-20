@@ -1014,6 +1014,168 @@ function drawRSI(id, closes){
   });
   el.innerHTML=`<svg width="${w}" height="${H}" style="display:block">${svg}</svg>`;
 }
+/* =================================================================
+   🧭 ADX 市场状态过滤 + 状态自适应 RSI（把"裸用 RSI"升级为"先判趋势/震荡，再解读 RSI"）
+   原理：RSI 的 80/20(或70/30)超买超卖反转，只在【震荡市】有效；【强趋势市】里 RSI 会在
+   超买/超卖区长期钝化，机械做反转会反向亏损。所以先用 ADX 判市场状态(regime)，再决定 RSI 怎么读。
+   纯前端 JS 实现(无后端)；analyzeRegime() 返回的对象=需求里那个"API 响应结构"。
+   ================================================================= */
+const TA_CFG={
+  ADX_PERIOD:14,            // ADX / ±DI 周期(Wilder)
+  ADX_TREND:25,            // ADX>=25 → 趋势市 trending
+  ADX_RANGE:20,            // ADX<20  → 震荡市 ranging；[20,25)=过渡 transitional(信号降权·标低置信)
+  RSI_PERIOD:14,
+  // ⚠️ 两套阈值不可混用：券商/Wilder 默认=70/30；用户学习素材用=80/20。默认走 70/30。
+  RSI_UPPER:70, RSI_LOWER:30,           // 默认(Wilder/券商)
+  RSI_UPPER_ALT:80, RSI_LOWER_ALT:20,   // 备选(学习素材)；切换请整套换、别一边80一边30
+  RSI_USE_ALT:false,       // true=改用 80/20 这套
+  DIV_LOOKBACK:60,         // 背离回看根数
+  DIV_SWING_K:3,           // 摆动高/低点的局部窗口(左右各 k 根)
+};
+function _rsiUpper(){ return TA_CFG.RSI_USE_ALT?TA_CFG.RSI_UPPER_ALT:TA_CFG.RSI_UPPER; }
+function _rsiLower(){ return TA_CFG.RSI_USE_ALT?TA_CFG.RSI_LOWER_ALT:TA_CFG.RSI_LOWER; }
+/* Wilder RMA(递归平滑)：seed=前 p 个简单平均，其后 rma=(rma*(p-1)+x)/p。注意：不是 SMA！(这是 ADX 最常见的实现 bug) */
+function _rma(arr,p){
+  const out=new Array(arr.length).fill(null);
+  if(arr.length<p) return out;
+  let s=0; for(let i=0;i<p;i++) s+=arr[i];
+  let r=s/p; out[p-1]=r;
+  for(let i=p;i<arr.length;i++){ r=(r*(p-1)+arr[i])/p; out[i]=r; }
+  return out;
+}
+/* ADX / +DI / -DI（标准 Wilder）。返回与"第1..n-1根"对齐的序列(n=TR长度)。
+   +DM/-DM 标准定义；TR=max(H-L,|H-Cprev|,|L-Cprev|)；±DI=100*RMA(±DM)/RMA(TR)；DX=100*|+DI - -DI|/(+DI + -DI)；ADX=RMA(DX)。
+   注：RMA 用"平均式"，±DI 的分子分母同被 p 约掉，结果与 Wilder"求和式"一致。 */
+function adxSeries(high,low,close,p){
+  p=p||TA_CFG.ADX_PERIOD;
+  const N=Math.min(high.length,low.length,close.length);
+  const TR=[],PDM=[],NDM=[];
+  for(let i=1;i<N;i++){
+    const up=high[i]-high[i-1], dn=low[i-1]-low[i];
+    PDM.push((up>dn&&up>0)?up:0);
+    NDM.push((dn>up&&dn>0)?dn:0);
+    TR.push(Math.max(high[i]-low[i], Math.abs(high[i]-close[i-1]), Math.abs(low[i]-close[i-1])));
+  }
+  if(TR.length<p+p){ return {adx:[],plusDI:[],minusDI:[],n:0}; }
+  const trR=_rma(TR,p), pdmR=_rma(PDM,p), ndmR=_rma(NDM,p);
+  const plusDI=[],minusDI=[],dx=[];
+  for(let k=0;k<TR.length;k++){
+    if(trR[k]==null||trR[k]===0){ plusDI.push(null);minusDI.push(null);dx.push(null);continue; }
+    const pD=100*pdmR[k]/trR[k], nD=100*ndmR[k]/trR[k]; plusDI.push(pD); minusDI.push(nD);
+    const sum=pD+nD; dx.push(sum===0?0:100*Math.abs(pD-nD)/sum);
+  }
+  const firstDX=p-1, adx=new Array(TR.length).fill(null);   // ADX=RMA(DX)，DX 从 k=p-1 起有效
+  if(TR.length-firstDX>=p){
+    let s=0; for(let k=firstDX;k<firstDX+p;k++) s+=dx[k];
+    let r=s/p; adx[firstDX+p-1]=r;
+    for(let k=firstDX+p;k<TR.length;k++){ r=(r*(p-1)+dx[k])/p; adx[k]=r; }
+  }
+  return {adx,plusDI,minusDI,n:TR.length};
+}
+function regimeOf(a){
+  if(a==null||isNaN(a)) return {regime:'unknown',label:'未知',color:'#8b949e'};
+  if(a>=TA_CFG.ADX_TREND) return {regime:'trending',label:'趋势市',color:'#3fb950'};
+  if(a<TA_CFG.ADX_RANGE)  return {regime:'ranging',label:'震荡市',color:'#58a6ff'};
+  return {regime:'transitional',label:'过渡区',color:'#d29922'};
+}
+/* 状态自适应 RSI 判读：rsi_signal_active=当前 RSI 反转信号是否被状态过滤器允许 */
+function rsiRegimeSignal(rsiVal,regime){
+  const up=_rsiUpper(), lo=_rsiLower();
+  if(rsiVal==null) return {signal:'none',desc:'RSI 数据不足',rsi_signal_active:false,confidence:'n/a'};
+  if(regime==='ranging'){
+    if(rsiVal>up) return {signal:'bearish_reversal',desc:`震荡市 · RSI ${Math.round(rsiVal)}>${up} → 看跌反转(超买回落)`,rsi_signal_active:true,confidence:'normal'};
+    if(rsiVal<lo) return {signal:'bullish_reversal',desc:`震荡市 · RSI ${Math.round(rsiVal)}<${lo} → 看涨反转(超卖反弹)`,rsi_signal_active:true,confidence:'normal'};
+    return {signal:'none',desc:`震荡市 · RSI ${Math.round(rsiVal)} 居中，暂无反转信号`,rsi_signal_active:false,confidence:'normal'};
+  }
+  if(regime==='trending'){   // 屏蔽超买超卖反转，改用 50 中轴；超买超卖只标动能高/低
+    let s=rsiVal>50?'bullish_bias':'bearish_bias', d=`趋势市 · RSI ${Math.round(rsiVal)}${rsiVal>50?'>50 → 多头倾向(顺势)':'<50 → 空头倾向(顺势)'}`;
+    if(rsiVal>up) d+=`；RSI>${up} 仅=动能高(趋势中钝化·不当反转卖出)`;
+    else if(rsiVal<lo) d+=`；RSI<${lo} 仅=动能低(不当反转买入)`;
+    return {signal:s,desc:d,rsi_signal_active:false,confidence:'normal'};
+  }
+  // transitional：照常出信号但低置信
+  if(rsiVal>up) return {signal:'bearish_reversal',desc:`过渡区 · RSI ${Math.round(rsiVal)}>${up} → 看跌反转(低置信)`,rsi_signal_active:true,confidence:'low'};
+  if(rsiVal<lo) return {signal:'bullish_reversal',desc:`过渡区 · RSI ${Math.round(rsiVal)}<${lo} → 看涨反转(低置信)`,rsi_signal_active:true,confidence:'low'};
+  return {signal:rsiVal>50?'bullish_bias':'bearish_bias',desc:`过渡区 · RSI ${Math.round(rsiVal)}，信号降权`,rsi_signal_active:false,confidence:'low'};
+}
+function weeklyTrendDir(wH,wL,wC){
+  const a=adxSeries(wH,wL,wC,TA_CFG.ADX_PERIOD), i=a.n-1;
+  const diDir=(i>=0&&a.plusDI[i]!=null&&a.minusDI[i]!=null)?(a.plusDI[i]>a.minusDI[i]?'up':'down'):null;
+  const wr=rsi(wC,TA_CFG.RSI_PERIOD), rsiDir=wr==null?null:(wr>=50?'up':'down');
+  return {dir:diDir||rsiDir, diDir, rsiDir, weeklyRSI:wr, weeklyADX:(i>=0?a.adx[i]:null)};
+}
+function timeframeAlignment(dDir,wDir){
+  if(!dDir||!wDir) return {alignment:'n/a',label:'—'};
+  return dDir===wDir?{alignment:'aligned',label:'日/周一致'}:{alignment:'conflict',label:'日/周冲突'};
+}
+/* 摆动高/低点(局部极值，窗口 k) */
+function findSwings(v,k){
+  const hi=[],lo=[];
+  for(let i=k;i<v.length-k;i++){ let H=true,L=true;
+    for(let j=i-k;j<=i+k;j++){ if(j===i)continue; if(v[j]>=v[i])H=false; if(v[j]<=v[i])L=false; }
+    if(H)hi.push(i); if(L)lo.push(i); }
+  return {hi,lo};
+}
+/* 背离：近 N 根内比价格与 RSI 的摆动高/低点。顶背离=价更高高点+RSI更低高点；底背离=价更低低点+RSI更高低点。
+   ⚠️ 背离=衰竭预警，不是买卖触发，可连续失败 → 不要接进自动告警的买卖动作。 */
+function findDivergence(closes,rsiArr,N,k){
+  N=N||TA_CFG.DIV_LOOKBACK; k=k||TA_CFG.DIV_SWING_K;
+  const n=closes.length; if(n<k*2+4) return {type:null,note:''};
+  const start=Math.max(0,n-N), seg=closes.slice(start), rseg=rsiArr.slice(start);
+  const sw=findSwings(seg,k);
+  if(sw.hi.length>=2){ const a=sw.hi[sw.hi.length-2], b=sw.hi[sw.hi.length-1];
+    if(seg[b]>seg[a]&&rseg[a]!=null&&rseg[b]!=null&&rseg[b]<rseg[a]) return {type:'top',note:`价新高、RSI 未新高(${Math.round(rseg[a])}→${Math.round(rseg[b])})`}; }
+  if(sw.lo.length>=2){ const a=sw.lo[sw.lo.length-2], b=sw.lo[sw.lo.length-1];
+    if(seg[b]<seg[a]&&rseg[a]!=null&&rseg[b]!=null&&rseg[b]>rseg[a]) return {type:'bottom',note:`价新低、RSI 未新低(${Math.round(rseg[a])}→${Math.round(rseg[b])})`}; }
+  return {type:null,note:''};
+}
+/* 总编排：返回结构化对象(=需求的 API 响应)。daily/weekly = {h,l,c} */
+function analyzeRegime(daily,weekly){
+  const {h,l,c}=daily, aD=adxSeries(h,l,c,TA_CFG.ADX_PERIOD), i=aD.n-1;
+  const adxVal=i>=0?aD.adx[i]:null, plusDI=i>=0?aD.plusDI[i]:null, minusDI=i>=0?aD.minusDI[i]:null;
+  const reg=regimeOf(adxVal), rsiVal=rsi(c,TA_CFG.RSI_PERIOD), sig=rsiRegimeSignal(rsiVal,reg.regime);
+  const dailyDir=(plusDI!=null&&minusDI!=null)?(plusDI>minusDI?'up':'down'):(rsiVal!=null?(rsiVal>=50?'up':'down'):null);
+  let mtf={alignment:'n/a',label:'—'}, wk=null;
+  if(weekly&&weekly.c&&weekly.c.length>TA_CFG.ADX_PERIOD+TA_CFG.ADX_PERIOD){ wk=weeklyTrendDir(weekly.h,weekly.l,weekly.c); mtf=timeframeAlignment(dailyDir,wk.dir); }
+  const div=findDivergence(c, rsiSeries(c,TA_CFG.RSI_PERIOD), TA_CFG.DIV_LOOKBACK, TA_CFG.DIV_SWING_K);
+  return { adx:adxVal, plusDI, minusDI, regime:reg.regime, regimeLabel:reg.label, regimeColor:reg.color,
+    rsi:rsiVal, rsi_signal:sig.signal, rsi_desc:sig.desc, rsi_signal_active:sig.rsi_signal_active, confidence:sig.confidence,
+    dailyDir, weekly:wk, timeframe_alignment:mtf.alignment, timeframe_label:mtf.label,
+    divergence:div.type, divergence_note:div.note,
+    thresholds:{adx_trend:TA_CFG.ADX_TREND, adx_range:TA_CFG.ADX_RANGE, rsi_upper:_rsiUpper(), rsi_lower:_rsiLower()} };
+}
+async function loadRegimeAnalysis(tk){
+  const box=document.getElementById('regimeBox'); if(!box)return;
+  try{
+    const [d,w]=await Promise.all([ yahoo(tk,'2y','1d'), yahoo(tk,'2y','1wk').catch(()=>null) ]);
+    if(!d||!d.c||d.c.length<TA_CFG.ADX_PERIOD*2+5){ box.innerHTML='<div class="muted small">历史数据不足，无法计算 ADX。</div>'; return; }
+    box.innerHTML=renderRegimeBox(analyzeRegime({h:d.h,l:d.l,c:d.c}, (w&&w.c)?{h:w.h,l:w.l,c:w.c}:null));
+  }catch(e){ box.innerHTML='<div class="muted small">取数失败，点「分析」重试。</div>'; }
+}
+function renderRegimeBox(R){
+  const up=R.thresholds.rsi_upper, lo=R.thresholds.rsi_lower;
+  const act=R.rsi_signal_active?'<span class="pill buy">RSI反转信号·生效</span>':'<span class="pill" style="background:rgba(139,148,158,.22);color:#8b949e">反转信号·被状态过滤器屏蔽</span>';
+  const conf=R.confidence==='low'?' <span class="pill" style="background:rgba(210,153,34,.2);color:#d29922">低置信</span>':'';
+  const mc=R.timeframe_alignment==='aligned'?'#3fb950':(R.timeframe_alignment==='conflict'?'#f85149':'#8b949e');
+  const div=R.divergence==='top'?`<span style="color:#f85149">⚠️ 顶背离</span> <span class="muted">${R.divergence_note}</span>`
+          :R.divergence==='bottom'?`<span style="color:#3fb950">⚠️ 底背离</span> <span class="muted">${R.divergence_note}</span>`
+          :'<span class="muted">无明显背离</span>';
+  return `<div class="grid cards">
+    <div class="panel sig"><div class="meta">市场状态 · ADX${TA_CFG.ADX_PERIOD}(Wilder)</div>
+      <div class="val" style="font-size:17px;color:${R.regimeColor}">${R.regimeLabel}</div>
+      <div class="meta">ADX ${fmt(R.adx,1)} · +DI ${fmt(R.plusDI,1)} / −DI ${fmt(R.minusDI,1)} <span class="muted">(≥${TA_CFG.ADX_TREND}趋势·<${TA_CFG.ADX_RANGE}震荡)</span></div></div>
+    <div class="panel sig"><div class="meta">状态自适应 RSI · 阈值 ${up}/${lo}${conf}</div>
+      <div class="val" style="font-size:14px;line-height:1.35">${R.rsi_desc}</div>
+      <div class="meta">${act}</div></div>
+    <div class="panel sig"><div class="meta">周线对齐(日 vs 周)</div>
+      <div class="val" style="font-size:17px;color:${mc}">${R.timeframe_label}</div>
+      <div class="meta">${R.weekly?`周线${R.weekly.dir==='up'?'偏多':'偏空'}(${R.weekly.diDir?'DI':'RSI'}) · 周RSI ${fmt(R.weekly.weeklyRSI,0)} · 周ADX ${fmt(R.weekly.weeklyADX,0)}`:'周线数据不足'}${R.timeframe_alignment==='conflict'?' · <span style="color:#f85149">冲突→降权</span>':''}</div></div>
+    <div class="panel sig"><div class="meta">RSI 背离 · 近${TA_CFG.DIV_LOOKBACK}根</div>
+      <div class="val" style="font-size:14px;line-height:1.35">${div}</div>
+      <div class="meta muted">衰竭预警·非买卖触发(可连续失败)</div></div>
+  </div>
+  <div class="small muted" style="margin-top:6px;line-height:1.55">原理：RSI 超买超卖反转只在<b>震荡市</b>有效；<b>趋势市</b>里 RSI 会在超买/超卖区<b>钝化</b>，机械做反转会反向亏损 → 先用 <b>ADX</b> 判状态、再决定怎么读 RSI。当前阈值 ${up}/${lo} = ${TA_CFG.RSI_USE_ALT?'80/20(学习素材)':'70/30(券商/Wilder默认)'}，<b>两套不可混用</b>。背离是衰竭预警、非买卖触发。<b>量化参考·非投资建议。</b></div>`;
+}
 const CHARTS={};
 const C_RANGES=[['1d','1日'],['5d','5日'],['1mo','1月'],['3mo','3月'],['6mo','6月'],['1y','1年'],['2y','2年'],['5y','5年']];
 const C_INTERVALS=[['1m','1分'],['30m','30分'],['60m','1时'],['4h','4时'],['1d','日'],['1wk','周'],['1mo','月']];
@@ -2708,6 +2870,8 @@ function renderStockDetail(tk,m,target){
         <div class="val" style="font-size:17px;color:${(volStat&&volStat.ratio!=null)?(volStat.ratio>=1.5?'#d29922':'#8b949e'):'#8b949e'}">${(volStat&&volStat.ratio!=null)?fmt(volStat.ratio,2)+'×':'–'} <span class="muted" style="font-size:12px">${(volStat&&volStat.ratio!=null)?(volStat.ratio>=1.5?'放量':(volStat.ratio<=0.7?'缩量':'正常')):''}</span></div>
         <div class="meta">今日 ${volLabel(volStat?.today)} · 均 ${volLabel(volStat?.avg)}</div></div>
     </div>
+    <h3 style="margin:10px 2px 4px;font-size:12px;color:var(--muted)">🧭 市场状态过滤 + 状态自适应 RSI（ADX regime · 周线对齐 · 背离 · 不计入上面评分）</h3>
+    <div id="regimeBox"><div class="muted small" style="padding:6px">计算 ADX 市场状态中…</div></div>
     <h3 style="margin:10px 2px 4px;font-size:12px;color:var(--muted)">⚠️ 风险 / 估值参考</h3>
     <div class="grid cards">
       ${metric('年化波动',pct(vol*100,0))}
@@ -2720,7 +2884,7 @@ function renderStockDetail(tk,m,target){
     <div class="small muted" style="margin-top:8px">行情 Yahoo·基本面/新闻/同业 Finnhub·简介 维基百科。技术估值=相对自身历史位置。所有数字与建议均为量化参考、<b>非投资建议</b>，请控仓+止损。</div>`;
   mountChart('stkChart','stkChartCtrl',tk,{range:'1y',interval:'1d',type:'candle',ma:200,dec:2});
   loadFundamentals(tk, price);
-  loadCompanyInfo(tk, name); loadPeers(tk); loadCompanyNews(tk); loadEarnings(tk); loadAnalysts(tk); loadAnalystTarget(tk, price); loadInvestorLenses(tk, m); loadStockSummary(tk);
+  loadCompanyInfo(tk, name); loadPeers(tk); loadCompanyNews(tk); loadEarnings(tk); loadAnalysts(tk); loadAnalystTarget(tk, price); loadInvestorLenses(tk, m); loadStockSummary(tk); loadRegimeAnalysis(tk);
 }
 
 /* ---- 主题板块（联网调研的真实当前龙头 + 催化剂，2026-06）+ 长期关注 ---- */
@@ -4089,7 +4253,7 @@ function boot(){
   setTimeout(checkBuild, 5000); setInterval(checkBuild, 300000);   // 自动检测云端新版本
 }
 /* 版本号：每次部署都会 +1，用于「刷新即最新」检测。格式 YYYYMMDD-HHMM(字符串比较=时间先后) */
-const BUILD='20260619-0830';
+const BUILD='20260619-0930';
 async function checkBuild(){
   try{ const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'}); const t=await r.text();
     const m=t.match(/const BUILD='([0-9-]+)'/);
